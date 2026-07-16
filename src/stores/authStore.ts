@@ -138,31 +138,27 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    // ✅ NUEVO: Actualizar Elo después de una partida
-    async updateElo(newElo: number, result?: "win" | "loss" | "draw") {
-      try {
-        await api.put("/auth/elo", { newElo, result });
-        if (this.user) {
-          this.user.elo = newElo;
-        }
-        return { success: true };
-      } catch (err) {
-        console.error("Error actualizando Elo:", err);
-        return { success: false };
-      }
-    },
-
     /**
-     * ✅ Actualizar estadísticas del usuario
+     * ✅ NUEVO: Actualizar todo el resultado de la partida de una sola vez
+     * (Elo + Victorias/Derrotas/Empates)
      */
-    updateStats(stats: { wins?: number; losses?: number; draws?: number }) {
-      if (this.user) {
-        if (stats.wins !== undefined) this.user.wins = stats.wins;
-        if (stats.losses !== undefined) this.user.losses = stats.losses;
-        if (stats.draws !== undefined) this.user.draws = stats.draws;
-      }
-    },
+    updateLocalElo(newElo: number, result?: "win" | "loss" | "draw") {
+      if (!this.user) return;
 
+      // 1. Actualizar Elo
+      this.user.elo = newElo;
+
+      // 2. Actualizar estadísticas de partidas (Victorias/Derrotas/Empates)
+      if (result === "win") {
+        this.user.wins = (this.user.wins || 0) + 1;
+      } else if (result === "loss") {
+        this.user.losses = (this.user.losses || 0) + 1;
+      } else if (result === "draw") {
+        this.user.draws = (this.user.draws || 0) + 1;
+      }
+      
+      console.log(`✅ Elo actualizado localmente: ${this.user.elo} (${result || 'sin resultado'})`);
+    },
     /**
      * 🧹 Limpiar errores
      */

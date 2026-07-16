@@ -15,7 +15,7 @@ export const useGameStore = defineStore("game", {
     opponentIsGuest: true,
     myColor: "" as "w" | "b" | "",
     currentFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    lastMove: [] as Key[],
+    lastMove: [] as string[] | string | null,
     isConnected: false,
     isSearching: false,
     chatAvailable: false,
@@ -60,6 +60,9 @@ export const useGameStore = defineStore("game", {
       text: string;
       timestamp: string;
     }>,
+    afkWarning: "",
+    afkCountdown: 0,
+    opponentAfkMessage: "",
   }),
 
   actions: {
@@ -177,17 +180,17 @@ export const useGameStore = defineStore("game", {
 
       console.log(`[Pinia] Mi Socket ID Local es: "${socket.id}"`);
       console.log(`[Pinia] ID recibido para Blancas: "${data.white.id}"`);
-      const isBot = data.opponentIsBot || false;
-      this.isBotOpponent = isBot;
-      if (isBot) {
-        console.log(`🤖 Estás jugando contra un bot: ${this.opponentNick}`);
-      }
 
-      // ✅ Asignar color ANTES de guardar en sessionStorage
+      // ✅ Asignar color y detectar bot correctamente
       if (socket.id === data.white.id) {
         this.myColor = "w";
         this.opponentNick = data.black.nick;
         this.opponentElo = data.black.elo || 1200;
+        // ✅ Detectar si el oponente es un bot
+        this.isBotOpponent =
+          data.black.isBot ||
+          data.black.nick?.toLowerCase().includes("bot_") ||
+          false;
         console.log(
           "%c🟢 Asignado con éxito: Eres BLANCAS",
           "color: #00ff00; font-weight: bold;",
@@ -196,6 +199,7 @@ export const useGameStore = defineStore("game", {
         this.myColor = "b";
         this.opponentNick = data.white.nick;
         this.opponentElo = data.white.elo || 1200;
+        // ✅ Detectar si el oponente es un bot
         this.isBotOpponent =
           data.white.isBot ||
           data.white.nick?.toLowerCase().includes("bot_") ||
@@ -205,6 +209,8 @@ export const useGameStore = defineStore("game", {
           "color: #00ff00; font-weight: bold;",
         );
       }
+
+      // ✅ Mensaje si es un bot
       if (this.isBotOpponent) {
         console.log(`🤖 Estás jugando contra un bot: ${this.opponentNick}`);
         this.addSystemMessage(
@@ -252,14 +258,31 @@ export const useGameStore = defineStore("game", {
         this.eloChange = blackChange;
         this.opponentEloChange = whiteChange;
       }
-
+      // ✅ ACTUALIZACIÓN OPTIMISTA LOCAL (Sin llamar a la API)
       const authStore = useAuthStore();
-      if (authStore.isAuthenticated && authStore.user) {
-        const newElo = authStore.user.elo + this.eloChange;
-        authStore.updateElo(newElo);
-        authStore.user.elo = newElo;
-      }
+      if (
+        authStore.isAuthenticated &&
+        authStore.user &&
+        data.reason !== "aborted" &&
+        data.reason !== "abort_by_inactivity"
+      ) {
+        // Determinar el resultado para actualizar wins/losses/draws
+        let result: "win" | "loss" | "draw" | undefined = undefined;
+        const msg = this.endGameMessage.toLowerCase();
 
+        if (msg.includes("victoria") || msg.includes("gana")) result = "win";
+        else if (msg.includes("derrota") || msg.includes("pierde"))
+          result = "loss";
+        else if (
+          msg.includes("tablas") ||
+          msg.includes("empate") ||
+          msg.includes("ahogado")
+        )
+          result = "draw";
+
+        const newTotalElo = authStore.user.elo + this.eloChange;
+        authStore.updateLocalElo(newTotalElo, result);
+      }
       // ✅ Limpiar sessionStorage al terminar la partida
       sessionStorage.removeItem("game_room_id");
       sessionStorage.removeItem("game_player_nick");
@@ -268,12 +291,9 @@ export const useGameStore = defineStore("game", {
 
     cancelSearch() {
       this.isSearching = false;
-      if (socket.connected) {
-        socket.emit("cancel_search", { nick: this.nick });
-        console.log(
-          `🛑 [Pinia] Emitido evento cancel_search para el socket actual.`,
-        );
-      }
+      console.log(
+        `🛑 [Pinia] Emitido evento cancel_search para el socket actual.`,
+      );
     },
 
     // ✅ CORREGIDO: resetGame con limpieza de sessionStorage
@@ -290,7 +310,7 @@ export const useGameStore = defineStore("game", {
       this.chatAvailable = false;
       this.lastMoveReceived = null;
       this.resetReconnectionState();
-
+      this.isBotOpponent = false;
       const syncSeconds = (this.selectedMinutes || 10) * 60;
       this.whiteTime = syncSeconds;
       this.blackTime = syncSeconds;

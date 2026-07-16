@@ -97,8 +97,10 @@
 import { ref, onMounted } from 'vue';
 import api from '../services/api';
 import { useRouter } from 'vue-router';
-const router = useRouter()
-// ✅ Estado
+
+const router = useRouter();
+
+// ✅ Estado local (Fuente de verdad de la UI)
 const botsEnabled = ref(true);
 const currentDifficulty = ref('easy');
 const botProbability = ref(100);
@@ -115,9 +117,8 @@ const confirmAccept = async () => {
   try {
     const success = await updateConfig();
     if (success) {
-      console.log('✅ Configuración guardada correctamente');
+      console.log('✅ Configuración guardada correctamente en el servidor');
       showConfirmModal.value = false;
-      // ✅ Pequeño delay para que se vea el modal cerrando
       setTimeout(() => {
         router.push('/');
       }, 300);
@@ -126,33 +127,25 @@ const confirmAccept = async () => {
     }
   } catch (error) {
     console.error('❌ Error al guardar configuración:', error);
-    alert('Error al guardar la configuración.');
+    alert('Error de conexión al guardar la configuración.');
   } finally {
     saving.value = false;
   }
 };
+
 const getDifficultyLabel = (level: string) => {
-  const labels: Record<string, string> = {
-    easy: 'Fácil',
-    medium: 'Medio',
-    hard: 'Difícil'
-  };
+  const labels: Record<string, string> = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil' };
   return labels[level] || level;
 };
 
-const toggleBots = async () => {
+// ✅ Solo actualiza el estado local. La API se llama al dar "Aceptar".
+const toggleBots = () => {
   botsEnabled.value = !botsEnabled.value;
-  await updateConfig();
 };
 
-const setDifficulty = async (level: string) => {
+// ✅ Solo actualiza el estado local. La API se llama al dar "Aceptar".
+const setDifficulty = (level: string) => {
   currentDifficulty.value = level;
-  try {
-    await api.post('/admin/bot-difficulty', { difficulty: level });
-    console.log(`✅ Dificultad cambiada a: ${level}`);
-  } catch (error) {
-    console.error('❌ Error cambiando dificultad:', error);
-  }
 };
 
 const updateConfig = async () => {
@@ -163,7 +156,6 @@ const updateConfig = async () => {
       botProbability: botProbability.value,
       minPlayersToDisable: minPlayersToDisable.value
     });
-    console.log('✅ Configuración actualizada');
     return true;
   } catch (error) {
     console.error('❌ Error actualizando configuración:', error);
@@ -177,13 +169,13 @@ const loadStats = async () => {
     const response = await api.get('/admin/bot-stats');
     if (response.data.status === 'success') {
       botStats.value = response.data.data;
-      // ✅ Sincronizar configuración
-      if (response.data.data.config) {
-        botsEnabled.value = response.data.data.config.ENABLED;
-        currentDifficulty.value = response.data.data.config.DIFFICULTY || 'easy';
-        botProbability.value = response.data.data.config.BOT_PROBABILITY || 100;
-        minPlayersToDisable.value = response.data.data.config.MIN_PLAYERS_TO_DISABLE_BOTS || 5;
-      }
+      
+      // ✅ Sincronizar configuración (maneja tanto camelCase como UPPER_CASE por si acaso)
+      const config = response.data.data.config || {};
+      botsEnabled.value = config.enabled ?? config.ENABLED ?? true;
+      currentDifficulty.value = config.difficulty ?? config.DIFFICULTY ?? 'easy';
+      botProbability.value = config.botProbability ?? config.BOT_PROBABILITY ?? 100;
+      minPlayersToDisable.value = config.minPlayersToDisable ?? config.MIN_PLAYERS_TO_DISABLE_BOTS ?? 5;
     }
   } catch (error) {
     console.error('❌ Error cargando estadísticas:', error);
@@ -193,15 +185,22 @@ const loadStats = async () => {
 };
 
 const resetConfig = async () => {
+  // 1. Resetear estado local
   botsEnabled.value = true;
   currentDifficulty.value = 'easy';
   botProbability.value = 100;
   minPlayersToDisable.value = 5;
-  await updateConfig();
-  await loadStats();
+  
+  // 2. Guardar en el servidor
+  const success = await updateConfig();
+  if (success) {
+    console.log('✅ Configuración restaurada a valores por defecto');
+    await loadStats(); // Recargar para confirmar
+  } else {
+    alert('Error al restaurar la configuración en el servidor.');
+  }
 };
 
-// ✅ Cargar al montar
 onMounted(() => {
   loadStats();
 });

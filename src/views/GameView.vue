@@ -1,22 +1,17 @@
-<!-- src/views/GameView.vue -->
+<!--src/views/GameView.vue-->
 <template>
     <div class="game-container">
         <div class="game-layout">
-            <!-- ✅ Banner de reconexión -->
-            <div v-if="isReconnecting" class="reconnecting-banner">
+            <!-- ✅ Banner de reconexión (usa gameStore directamente) -->
+            <div v-if="gameStore.isReconnecting" class="reconnecting-banner">
                 <div class="reconnecting-content">
                     <div class="spinner-small"></div>
-                    <span class="reconnecting-text">{{ localStatusMessage || '🔄 Reconectando...' }}</span>
-                    <span class="reconnecting-countdown" v-if="reconnectCountdown > 0">
-                        {{ reconnectCountdown }}s
-                    </span>
-                </div>
-                <div class="reconnecting-progress">
-                    <div class="progress-bar" :style="{ width: `${(30 - reconnectCountdown) / 30 * 100}%` }"></div>
+                    <span class="reconnecting-text">🔄 Reconectando...</span>
                 </div>
             </div>
+
             <!-- ✅ Banner de desconexión del oponente -->
-            <div v-if="gameStore.opponentDisconnected && !isReconnecting" class="disconnection-banner">
+            <div v-if="gameStore.opponentDisconnected && !gameStore.isReconnecting" class="disconnection-banner">
                 <span>⏳ {{ gameStore.opponentDisconnectedMessage }}</span>
                 <div class="reconnection-timer" v-if="gameStore.reconnectionTime > 0">
                     <strong>{{ gameStore.reconnectionTime }}s</strong>
@@ -28,34 +23,30 @@
                 <span>⏸️ Partida en pausa</span>
             </div>
 
-            <!-- ✅ Banner de reconexión en curso -->
-            <div v-if="gameStore.isReconnecting" class="reconnecting-banner">
-                <span>🔄 Reconectando...</span>
-                <div class="spinner-small"></div>
-            </div>
-            <!-- Banner AFK -->
-            <div v-if="rivalEstaAFK && !isMeAFK" class="afk-banner-glass">
+            <!-- ✅ Banner AFK del oponente (usa gameStore.opponentAfkMessage) -->
+            <div v-if="gameStore.opponentAfkMessage && !gameStore.afkWarning" class="afk-banner-glass">
                 <div class="afk-info">
-                    <span>⏳ {{ mensajeAFK }}</span>
+                    <span>⏳ {{ gameStore.opponentAfkMessage }}</span>
                 </div>
             </div>
-            <!-- Banner de advertencia para el jugador AFK (el que está demorando) -->
-            <div v-if="isMeAFK && !gameStore.gameEnded" class="afk-warning-banner-glass">
+
+            <!-- ✅ Banner de advertencia AFK para ti (usa gameStore.afkWarning y afkCountdown) -->
+            <div v-if="gameStore.afkWarning && !gameStore.gameEnded" class="afk-warning-banner-glass">
                 <div class="afk-warning-info">
-                    <!-- ✅ El mensaje base es fijo, solo cambia el número en el contador -->
-                    <span>⚠️ Tienes <strong>{{ afkCountdown }}s</strong> para mover o perderás.</span>
+                    <span>⚠️ Tienes <strong>{{ gameStore.afkCountdown }}s</strong> para mover o perderás.</span>
                 </div>
-                <div class="afk-countdown" v-if="afkCountdown > 0">
-                    ⏱️ <strong>{{ afkCountdown }}s</strong> restantes
+                <div class="afk-countdown" v-if="gameStore.afkCountdown > 0">
+                    ⏱️ <strong>{{ gameStore.afkCountdown }}s</strong> restantes
                 </div>
             </div>
+
             <!-- ⏱️ Banner de cortesía para el primer movimiento -->
             <div v-if="gameStore.moveCount === 0 && gameStore.myColor === 'w' && courtesyCountdown > 0"
                 class="courtesy-badge-glass">
                 <span>⏱️ Tiempo de cortesía: <strong>{{ courtesyCountdown }}s</strong></span>
             </div>
 
-            <!-- ⏱️ Banner de advertencia de tiempo para el jugador actual -->
+            <!-- ⏱️ Banner de advertencia de tiempo -->
             <div v-if="gameStore.gameStarted && !gameStore.gameEnded && isMyTurn && playerTimeWarning"
                 class="time-warning-banner">
                 ⚠️ ¡Poco tiempo! <strong>{{ formatTime(getCurrentPlayerTime()) }}</strong>
@@ -78,10 +69,6 @@
                     <span class="player-tag" :class="{ 'tag-rated': gameStore.opponentNick }">
                         {{ gameStore.opponentNick ? `📈 Elo: ${gameStore.opponentElo}` : 'ESPERANDO' }}
                     </span>
-                    <!-- 💬 Notificación de estado del oponente -->
-                    <span v-if="opponentStatusMessage" class="opponent-status" :class="opponentStatusClass">
-                        {{ opponentStatusMessage }}
-                    </span>
                 </div>
                 <div class="chess-clock" :class="{
                     'clock-active': gameStore.gameStarted && !isMyTurn,
@@ -92,8 +79,9 @@
             </div>
 
             <div class="board-wrapper"
-                :class="{ 'board-blocked': (gameStore.gameStarted && !isMyTurn) || gameStore.gameEnded }">
-                <TheChessboard :key="gameStore.currentFen" :board-config="boardConfig" @move="handleLocalMove" />
+                :class="{ 'board-blocked': (gameStore.gameStarted && !isMyTurn) || gameStore.gameEnded || gameStore.isPaused }">
+                <TheChessboard :board-config="boardConfig" @board-created="handleBoardCreated"
+                    @move="handleLocalMove" />
             </div>
 
             <!-- 👤 JUGADOR INFERIOR (TÚ) -->
@@ -102,10 +90,6 @@
                 <div class="player-info">
                     <span class="player-name">{{ gameStore.nick }} (Tú)</span>
                     <span class="player-tag tag-rated">📈Elo: {{ gameStore.elo }}</span>
-                    <!-- 💬 Notificación de estado del jugador local -->
-                    <span v-if="localStatusMessage" class="local-status" :class="localStatusClass">
-                        {{ localStatusMessage }}
-                    </span>
                 </div>
                 <div class="chess-clock" :class="{
                     'clock-active': gameStore.gameStarted && isMyTurn,
@@ -204,44 +188,34 @@
                         </template>
                         <template v-else>
                             <div class="endgame-action-row">
-                                <div class="endgame-action-row">
-                                    <!-- ✅ Botón de revancha (siempre visible) -->
-                                    <button v-if="!gameStore.endGameMessage.includes('Abortada')"
-                                        class="btn-modal-rematch" :class="{ 'half-width': authStore.isAuthenticated }"
-                                        @click="requestRematch">
-                                        ⚔️ Pedir Revancha
-                                    </button>
+                                <button v-if="!gameStore.endGameMessage.includes('Abortada')" class="btn-modal-rematch"
+                                    :class="{ 'half-width': authStore.isAuthenticated }" @click="requestRematch">
+                                    ⚔️ Pedir Revancha
+                                </button>
 
-                                    <!-- ✅ Botón de Jugar Otra Vez (cuando es abortada) -->
-                                    <button v-if="gameStore.endGameMessage.includes('Abortada')"
-                                        class="btn-modal-rematch" :class="{ 'half-width': authStore.isAuthenticated }"
-                                        @click="rematchGame">
-                                        🔄 Jugar Otra Vez
-                                    </button>
+                                <button v-if="gameStore.endGameMessage.includes('Abortada')" class="btn-modal-rematch"
+                                    :class="{ 'half-width': authStore.isAuthenticated }" @click="rematchGame">
+                                    🔄 Jugar Otra Vez
+                                </button>
 
-                                    <!-- ✅ Botón de Buscar Nueva Partida (cuando revancha rechazada) -->
-                                    <button v-else-if="gameStore.rematchDeclinedByOpponent" class="btn-modal-rematch"
-                                        :class="{ 'half-width': authStore.isAuthenticated }" @click="rematchGame">
-                                        🔍 Buscar Nueva Partida
-                                    </button>
+                                <button v-else-if="gameStore.rematchDeclinedByOpponent" class="btn-modal-rematch"
+                                    :class="{ 'half-width': authStore.isAuthenticated }" @click="rematchGame">
+                                    🔍 Buscar Nueva Partida
+                                </button>
 
-                                    <!-- ✅ Botón de Nueva Partida (para usuarios autenticados) -->
-                                    <button v-if="authStore.isAuthenticated" class="btn-modal-new-game"
-                                        @click="handlePlay">
-                                        🎮 Nueva Partida
-                                    </button>
+                                <button v-if="authStore.isAuthenticated" class="btn-modal-new-game" @click="handlePlay">
+                                    🎮 Nueva Partida
+                                </button>
 
-                                    <!-- ✅ Botón de Registrar Cuenta (SOLO para invitados) -->
-                                    <button v-if="!authStore.isAuthenticated" class="btn-modal-register"
-                                        @click="goToRegister">
-                                        💎 Registrar Cuenta
-                                    </button>
-                                </div>
-
-                                <button class="btn-modal-close-link" @click="exitGame">
-                                    Volver al Menú Principal
+                                <button v-if="!authStore.isAuthenticated" class="btn-modal-register"
+                                    @click="goToRegister">
+                                    💎 Registrar Cuenta
                                 </button>
                             </div>
+
+                            <button class="btn-modal-close-link" @click="exitGame">
+                                Volver al Menú Principal
+                            </button>
                         </template>
                     </div>
                 </div>
@@ -252,552 +226,116 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useGameStore } from '../stores/gameStore';
 import { useAuthStore } from '../stores/authStore';
 import { socket } from '../services/socketService';
-import { TheChessboard } from 'vue3-chessboard';
+import { BoardApi, TheChessboard } from 'vue3-chessboard';
 import GameChat from '../components/GameChat.vue';
 import 'vue3-chessboard/style.css';
 import router from '@/router';
+import { Chess } from 'chess.js';
+import type { Key } from 'chessground/types';
 
 const gameStore = useGameStore();
 const authStore = useAuthStore();
 
-// Estado de reconexión local
-const isReconnecting = ref(false);
-const reconnectionAttempts = ref(0);
-const maxReconnectionAttempts = 5;
-const reconnectCountdown = ref(30);
-let reconnectionTimer: NodeJS.Timeout | null = null;
-let countdownInterval: NodeJS.Timeout | null = null;
-
-// ⏱️ Variables de tiempo
-const courtesyCountdown = ref(60);
-const playerTimerInterval = ref<NodeJS.Timeout | null>(null);
-const courtesyInterval = ref<NodeJS.Timeout | null>(null);
-const timeWarningCountdown = ref(0);
-const timeWarningActive = ref(false);
-
-// 📢 Estado de oferta de tablas
+// ✅ Estado local SOLO para UI que no necesita estar en el store global
 const drawOfferPending = ref(false);
 const drawOfferNotification = ref(false);
-
-// 📢 Mensajes de estado
-const opponentStatusMessage = ref('');
-const opponentStatusClass = ref('');
-const localStatusMessage = ref('');
-const localStatusClass = ref('');
-
-// Estado AFK
-const rivalEstaAFK = ref(false);
-const isMeAFK = ref(false);
-const mensajeAFK = ref("");
-const afkCountdown = ref(0);
-let afkCountdownInterval: NodeJS.Timeout | null = null;
-const afkMessageInitialized = ref(false);
+const courtesyCountdown = ref(60);
+let courtesyInterval: ReturnType<typeof setInterval> | null = null;
+const boardKey = ref(0);
+const boardAPI = ref<BoardApi | null>(null);
+const shouldAnimate = ref(true);
 
 
-const opponentDisconnected = ref(false);
-const opponentDisconnectedMessage = ref('');
-const reconnectionTime = ref(0);
-
-const isBotOpponent = computed(() => {
-    return gameStore.isBotOpponent ||
-        gameStore.opponentNick?.toLowerCase().includes('bot_') ||
-        false;
-});
-// ✅ Función para resetear estado de reconexión
-const resetReconnectionState = () => {
-    isReconnecting.value = false;
-    reconnectionAttempts.value = 0;
-    reconnectCountdown.value = 30;
-
-    if (reconnectionTimer) {
-        clearTimeout(reconnectionTimer);
-        reconnectionTimer = null;
-    }
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-    }
-};
-
-// ✅ Función para intentar reconectar
-const attemptReconnection = () => {
-    if (reconnectionAttempts.value >= maxReconnectionAttempts) {
-        console.log(`❌ [GameView] Máximos intentos de reconexión alcanzados (${maxReconnectionAttempts})`);
-        handleReconnectionFailed('No se pudo reconectar después de varios intentos.');
-        return;
-    }
-
-    reconnectionAttempts.value++;
-    console.log(`🔄 [GameView] Intento ${reconnectionAttempts.value} de reconexión...`);
-
-    const nick = authStore.isAuthenticated ? authStore.currentNick : gameStore.nick;
-    const roomId = gameStore.roomId;
-
-    if (!roomId || !nick) {
-        console.log('❌ [GameView] Faltan datos para reconectar');
-        handleReconnectionFailed('Faltan datos para reconectar.');
-        return;
-    }
-    console.log(`🔄 [GameView] Enviando reconexión a sala ${roomId} con nick ${nick}`);
-    socket.emit('reconnect_to_room', {
-        roomId: roomId,
-        nick: nick
-    });
-};
-// ✅ Función para iniciar countdown de reconexión
-const startReconnectionCountdown = () => {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-    }
-
-    reconnectCountdown.value = 30;
-
-    countdownInterval = setInterval(() => {
-        reconnectCountdown.value--;
-        localStatusMessage.value = `🔄 Reconectando... ${reconnectCountdown.value}s`;
-
-        if (reconnectCountdown.value <= 0) {
-            clearInterval(countdownInterval!);
-            countdownInterval = null;
-        }
-    }, 1000);
-};
-// ✅ Manejar reconexión exitosa
-const handleReconnectionSuccess = (data: any) => {
-    console.log('✅ [GameView] Reconexión exitosa!');
-    resetReconnectionState();
-
-    gameStore.isReconnecting = false;
-    gameStore.isPaused = false;
-    gameStore.opponentDisconnected = false;
-    gameStore.opponentDisconnectedMessage = '';
-    gameStore.reconnectionTime = 0;
-
-    gameStore.currentFen = data.fen;
-    gameStore.whiteTime = data.whiteTime;
-    gameStore.blackTime = data.blackTime;
-    gameStore.moveCount = data.moveCount;
-    gameStore.myColor = data.myColor;
-    gameStore.gameStarted = true;
-
-    sessionStorage.removeItem('game_room_id');
-    sessionStorage.removeItem('game_player_nick');
-    sessionStorage.removeItem('game_my_color');
-
-    localStatusMessage.value = '✅ ¡Reconectado! La partida continúa.';
-    localStatusClass.value = 'status-success';
-
-    setTimeout(() => {
-        if (localStatusMessage.value === '✅ ¡Reconectado! La partida continúa.') {
-            localStatusMessage.value = '';
-            localStatusClass.value = '';
-        }
-    }, 2000);
-
-    console.log('🎮 ¡Reconectado! La partida continúa.');
-};
-
-// ✅ Manejar reconexión fallida
-const handleReconnectionFailed = (reason: string) => {
-    console.log(`❌ [GameView] Reconexión fallida: ${reason}`);
-    resetReconnectionState();
-
-    gameStore.isReconnecting = false;
-    gameStore.gameEnded = true;
-    gameStore.endGameMessage = reason || 'Perdiste por abandono (desconexión).';
-
-    sessionStorage.removeItem('game_room_id');
-    sessionStorage.removeItem('game_player_nick');
-    sessionStorage.removeItem('game_my_color');
-
-    localStatusMessage.value = `❌ ${reason}`;
-    localStatusClass.value = 'status-error';
-
-    setTimeout(() => {
-        router.push('/');
-    }, 3000);
-};
-// ✅ onBeforeMount: Detectar recarga de página
-onBeforeMount(() => {
-    const savedRoomId = sessionStorage.getItem('game_room_id');
-    const savedNick = sessionStorage.getItem('game_player_nick');
-    const savedColor = sessionStorage.getItem('game_my_color');
-
-    if (savedRoomId && savedNick && !gameStore.gameStarted && !gameStore.gameEnded) {
-        console.log(`🔄 [GameView] Detectada recarga de página. Intentando reconectar a sala ${savedRoomId}`);
-        gameStore.roomId = savedRoomId;
-        gameStore.nick = savedNick;
-        if (savedColor === 'w' || savedColor === 'b') {
-            gameStore.myColor = savedColor as 'w' | 'b';
-        }
-        isReconnecting.value = true;
-        gameStore.isReconnecting = true;
-        reconnectCountdown.value = 30;
-        localStatusMessage.value = '🔄 Reconectando...';
-        localStatusClass.value = 'status-reconnecting';
-
-        if (!socket.connected) {
-            socket.connect();
-        }
-        startReconnectionCountdown();
-        attemptReconnection();
-    }
-});
-
-// ⏱️ Computed para saber quién tiene el turno
-const currentTurnColor = computed(() => {
-    const turnLetter = gameStore.currentFen.split(' ')[1];
-    return (turnLetter === 'b' ? 'black' : 'white') as "white" | "black";
-});
+// ✅ Computed properties que leen directamente del store (Single Source of Truth)
+const isBotOpponent = computed(() => gameStore.isBotOpponent);
+const currentTurnColor = computed(() => (gameStore.currentFen.split(' ')[1] === 'b' ? 'black' : 'white') as "white" | "black");
 
 const isMyTurn = computed(() => {
-    if (!gameStore.gameStarted) return false;
+    if (!gameStore.gameStarted || gameStore.gameEnded) return false;
     const myColorFull = gameStore.myColor === 'w' ? 'white' : 'black';
     return currentTurnColor.value === myColorFull;
 });
-
-// ⏱️ Obtener tiempo del jugador actual
+function handleBoardCreated(api: BoardApi) {
+    boardAPI.value = api;
+}
 const getCurrentPlayerTime = (): number => {
-    if (!gameStore.gameStarted) return gameStore.selectedMinutes * 60;
     return gameStore.myColor === 'w' ? gameStore.whiteTime : gameStore.blackTime;
 };
 
-// ⏱️ Obtener tiempo del oponente
 const getOpponentTime = (): number => {
-    if (!gameStore.gameStarted) return gameStore.selectedMinutes * 60;
     return gameStore.myColor === 'w' ? gameStore.blackTime : gameStore.whiteTime;
 };
 
-// ⏱️ Advertencia de tiempo crítico (< 10 segundos)
-// ⏱️ Advertencia de tiempo crítico (< 10 segundos)
 const playerTimeWarning = computed(() => {
     if (!gameStore.gameStarted || gameStore.gameEnded) return false;
     const time = getCurrentPlayerTime();
     return time > 0 && time < 10;
 });
+const getDests = (fen: string) => {
+    try {
+        const chess = new Chess(fen);
+        const dests = new Map();
 
-// ⏱️ INICIALIZAR: Escuchar clock_update
-const initTimeWarningListener = () => {
-    socket.off('clock_update');
-
-    socket.on('clock_update', (data: { whiteTime: number; blackTime: number }) => {
-        gameStore.whiteTime = data.whiteTime;
-        gameStore.blackTime = data.blackTime;
-
-        if (gameStore.gameEnded || !gameStore.gameStarted) return;
-
-        const isMyTurnNow = isMyTurn.value;
-        const currentTime = isMyTurnNow ?
-            (gameStore.myColor === 'w' ? data.whiteTime : data.blackTime) :
-            (gameStore.myColor === 'w' ? data.blackTime : data.whiteTime);
-
-        if (currentTime > 0 && currentTime <= 20) {
-            if (!timeWarningActive.value || timeWarningCountdown.value !== currentTime) {
-                timeWarningActive.value = true;
-                timeWarningCountdown.value = currentTime;
-
-                if (isMyTurnNow) {
-                    localStatusMessage.value = `⏱️ ¡Tu tiempo se agota! ${timeWarningCountdown.value}s`;
-                    localStatusClass.value = 'status-warning';
-                } else {
-                    opponentStatusMessage.value = `⏱️ El oponente tiene ${timeWarningCountdown.value}s restantes`;
-                    opponentStatusClass.value = 'status-warning';
-                }
+        // Obtenemos todos los movimientos válidos y los agrupamos por casilla de origen
+        chess.moves({ verbose: true }).forEach(move => {
+            if (!dests.has(move.from)) {
+                dests.set(move.from, []);
             }
-        } else if (currentTime > 20 && timeWarningActive.value) {
-            timeWarningActive.value = false;
-            timeWarningCountdown.value = 0;
+            dests.get(move.from).push(move.to);
+        });
 
-            if (localStatusMessage.value.includes('tiempo se agota')) {
-                localStatusMessage.value = '';
-                localStatusClass.value = '';
-            }
-            if (opponentStatusMessage.value.includes('restantes')) {
-                opponentStatusMessage.value = '';
-                opponentStatusClass.value = '';
-            }
-        }
-    });
+        return dests;
+    } catch (e) {
+        console.error("Error al calcular dests:", e);
+        return new Map();
+    }
 };
-// ✅ Escuchar eventos de reconexión (SOLO UNA VEZ)
-socket.on('reconnect_success', handleReconnectionSuccess);
-socket.on('reconnect_failed', (data: { message: string }) => {
-    handleReconnectionFailed(data.message || 'No se pudo reconectar.');
+const formattedLastMove = computed(() => {
+    const rawMove = gameStore.lastMove as unknown;
+
+    if (!rawMove) return undefined;
+
+    // 1. Si el store lo maneja como un string plano (ej. "g8f6")
+    if (typeof rawMove === 'string' && rawMove.length === 4) {
+        return [
+            rawMove.substring(0, 2) as Key,
+            rawMove.substring(2, 4) as Key
+        ] as [Key, Key];
+    }
+
+    // 2. Si el store lo maneja como un array (ej. ['g8', 'f6'])
+    if (Array.isArray(rawMove) && rawMove.length === 2) {
+        return [
+            String(rawMove[0]) as Key,
+            String(rawMove[1]) as Key
+        ] as [Key, Key];
+    }
+
+    return undefined;
 });
-
-// ✅ Escuchar sincronización de estado
-socket.on('game_state_sync', (data: {
-    fen: string;
-    whiteTime: number;
-    blackTime: number;
-    turn: 'w' | 'b';
-    moveCount: number;
-    myColor: 'w' | 'b';
-}) => {
-    console.log('🔄 [GameView] Sincronizando estado del juego');
-
-    if (isReconnecting.value) {
-        handleReconnectionSuccess(data);
-        return;
-    }
-
-    gameStore.currentFen = data.fen;
-    gameStore.whiteTime = data.whiteTime;
-    gameStore.blackTime = data.blackTime;
-    gameStore.moveCount = data.moveCount;
-    gameStore.myColor = data.myColor;
-    gameStore.gameStarted = true;
-    gameStore.isPaused = false;
-    gameStore.isReconnecting = false;
-
-    const isMyTurn = (data.turn === 'w' && data.myColor === 'w') ||
-        (data.turn === 'b' && data.myColor === 'b');
-    if (isMyTurn) {
-        console.log('🎯 Es tu turno, puedes mover');
-        localStatusMessage.value = '🎯 Tu turno';
-        localStatusClass.value = 'status-info';
-        setTimeout(() => {
-            if (localStatusMessage.value === '🎯 Tu turno') {
-                localStatusMessage.value = '';
-                localStatusClass.value = '';
-            }
-        }, 1500);
-    }
-});
-
-// ✅ Escuchar game_resumed
-socket.on('game_resumed', (data: { message: string }) => {
-    console.log('🎮 Partida reanudada:', data.message);
-    gameStore.isPaused = false;
-    resetReconnectionState();
-
-    localStatusMessage.value = '✅ Partida reanudada';
-    localStatusClass.value = 'status-success';
-    setTimeout(() => {
-        if (localStatusMessage.value === '✅ Partida reanudada') {
-            localStatusMessage.value = '';
-            localStatusClass.value = '';
-        }
-    }, 2000);
-});
-
-// ✅ Escuchar player_disconnected
-socket.on('player_disconnected', (data: { message: string; waitingTime: number }) => {
-    console.log('👤 Oponente desconectado:', data.message);
-    gameStore.opponentDisconnected = true;
-    gameStore.opponentDisconnectedMessage = data.message;
-    gameStore.reconnectionTime = data.waitingTime;
-    gameStore.isPaused = true;
-});
-
-// ✅ Escuchar player_reconnected
-socket.on('player_reconnected', (data: { message: string }) => {
-    console.log('👤 Oponente reconectado:', data.message);
-    gameStore.opponentDisconnected = false;
-    gameStore.opponentDisconnectedMessage = '';
-    gameStore.reconnectionTime = 0;
-    gameStore.isPaused = false;
-});
-
-// ✅ Escuchar bot_joined
-socket.on('bot_joined', (data: { nick: string; elo: number; color: 'w' | 'b' }) => {
-    console.log(`🤖 Bot ${data.nick} (${data.elo} Elo) se unió como ${data.color === 'w' ? 'Blancas' : 'Negras'}`);
-    gameStore.opponentNick = data.nick;
-    gameStore.opponentElo = data.elo;
-    gameStore.isBotOpponent = true;
-    gameStore.addSystemMessage(`🤖 Has sido emparejado con el bot ${data.nick}`);
-});
-
-// ⏱️ Iniciar el contador de cortesía
-const startCourtesyTimer = () => {
-    if (courtesyInterval.value) {
-        clearInterval(courtesyInterval.value);
-    }
-
-    courtesyCountdown.value = 60;
-
-    courtesyInterval.value = setInterval(() => {
-        if (courtesyCountdown.value > 0) {
-            courtesyCountdown.value--;
-        } else {
-            if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
-                console.log("⏱️ Tiempo de cortesía agotado. Abortando partida...");
-                socket.emit('abort_game', { roomId: gameStore.roomId });
-                clearInterval(courtesyInterval.value!);
-                courtesyInterval.value = null;
-            }
-        }
-    }, 1000);
-};
-
-// ⏱️ Iniciar el temporizador de jugadores
-const startPlayerTimer = () => {
-    if (playerTimerInterval.value) {
-        clearInterval(playerTimerInterval.value);
-    }
-
-    timeWarningActive.value = false;
-    timeWarningCountdown.value = 0;
-
-    playerTimerInterval.value = setInterval(() => {
-        if (!gameStore.gameStarted || gameStore.gameEnded) return;
-
-        const isWhiteTurn = gameStore.currentFen.split(' ')[1] === 'w';
-
-        if (isWhiteTurn) {
-            if (gameStore.whiteTime > 0) {
-                gameStore.whiteTime--;
-            }
-            if (gameStore.whiteTime <= 0) {
-                gameStore.whiteTime = 0;
-                return;
-            }
-        } else {
-            if (gameStore.blackTime > 0) {
-                gameStore.blackTime--;
-            }
-            if (gameStore.blackTime <= 0) {
-                gameStore.blackTime = 0;
-                return;
-            }
-        }
-
-        const isMyTurnNow = isMyTurn.value;
-        const currentTime = getCurrentPlayerTime();
-
-        if (currentTime > 0 && currentTime <= 20 && isMyTurnNow) {
-            if (!timeWarningActive.value || timeWarningCountdown.value !== currentTime) {
-                timeWarningActive.value = true;
-                timeWarningCountdown.value = currentTime;
-                localStatusMessage.value = `⏱️ ¡Tu tiempo se agota! ${timeWarningCountdown.value}s`;
-                localStatusClass.value = 'status-warning';
-            }
-        } else if (currentTime > 20 && timeWarningActive.value) {
-            timeWarningActive.value = false;
-            timeWarningCountdown.value = 0;
-            if (localStatusMessage.value.includes('tiempo se agota')) {
-                localStatusMessage.value = '';
-                localStatusClass.value = '';
-            }
-        }
-
-        if (!isMyTurnNow && gameStore.gameStarted) {
-            const opponentTime = getOpponentTime();
-            if (opponentTime > 0 && opponentTime <= 20) {
-                const currentOpponentMsg = opponentStatusMessage.value;
-                const currentCount = parseInt(currentOpponentMsg.match(/\d+/)?.[0] || '0');
-                if (currentCount !== opponentTime) {
-                    opponentStatusMessage.value = `⏱️ El oponente tiene ${opponentTime}s restantes`;
-                    opponentStatusClass.value = 'status-warning';
-                }
-            } else if (opponentTime > 20 && opponentStatusMessage.value.includes('restantes')) {
-                opponentStatusMessage.value = '';
-                opponentStatusClass.value = '';
-            }
-        }
-    }, 1000);
-};
-
-// ⏱️ Detener todos los temporizadores
-const stopAllTimers = () => {
-    if (courtesyInterval.value) {
-        clearInterval(courtesyInterval.value);
-        courtesyInterval.value = null;
-    }
-    if (playerTimerInterval.value) {
-        clearInterval(playerTimerInterval.value);
-        playerTimerInterval.value = null;
-    }
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-    timeWarningActive.value = false;
-    timeWarningCountdown.value = 0;
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
-};
-
-// ⏱️ Reiniciar los temporizadores después de un movimiento
-const resetTimersAfterMove = () => {
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
-    timeWarningCountdown.value = 0;
-    timeWarningActive.value = false;
-
-    rivalEstaAFK.value = false;
-    isMeAFK.value = false;
-    mensajeAFK.value = "";
-    afkCountdown.value = 0;
-
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
-    localStatusClass.value = '';
-    opponentStatusClass.value = '';
-
-    if (gameStore.moveCount === 1) {
-        if (courtesyInterval.value) {
-            clearInterval(courtesyInterval.value);
-            courtesyInterval.value = null;
-        }
-        startPlayerTimer();
-    }
-};
-
-// 📢 Oferta de tablas
-const offerDraw = () => {
-    if (drawOfferPending.value) return;
-
-    drawOfferPending.value = true;
-    drawOfferNotification.value = true;
-    localStatusMessage.value = `🤝 Has enviado una propuesta de tablas a ${gameStore.opponentNick}`;
-    localStatusClass.value = 'status-draw-offer';
-
-    socket.emit('offer_draw', { roomId: gameStore.roomId });
-
-    setTimeout(() => {
-        if (drawOfferPending.value) {
-            cancelDrawOffer();
-        }
-    }, 30000);
-};
-
-const cancelDrawOffer = () => {
-    drawOfferPending.value = false;
-    drawOfferNotification.value = false;
-    if (localStatusMessage.value.includes('propuesta de tablas')) {
-        localStatusMessage.value = '';
-        localStatusClass.value = '';
-    }
-    socket.emit('cancel_draw_offer', { roomId: gameStore.roomId });
-};
-
-// 🎯 Board config
 const boardConfig = computed(() => {
     const myColorFull: "white" | "black" = gameStore.myColor === 'w' ? 'white' : 'black';
-    const isInitialTurn = gameStore.moveCount === 0 && gameStore.myColor === 'w';
-    const canIMove = !gameStore.gameEnded && (isInitialTurn || isMyTurn.value);
+    const canIMove = !gameStore.gameEnded &&
+        !gameStore.isPaused &&
+        ((gameStore.moveCount === 0 && gameStore.myColor === 'w') || isMyTurn.value);
+
     return {
         coordinates: true,
         fen: gameStore.currentFen,
         orientation: myColorFull,
         turnColor: currentTurnColor.value,
-        lastMove: gameStore.lastMove.length > 0 ? gameStore.lastMove : undefined,
-        animation: { enabled: false, duration: 0 },
+        // 👇 Pasamos el movimiento formateado que forzará el resaltado
+        lastMove: formattedLastMove.value,
+
+        animation: { enabled: shouldAnimate.value, duration: 200 },
         movable: {
             color: canIMove ? myColorFull : undefined,
             free: false,
-            dests: undefined
+            dests: canIMove ? getDests(gameStore.currentFen) : new Map(),
         },
         draggable: {
             enabled: canIMove
@@ -805,38 +343,45 @@ const boardConfig = computed(() => {
     };
 });
 
-// 💡 Elo changes
-const myVisualEloChange = computed(() => {
-    if (gameStore.eloChange !== 0) return gameStore.eloChange;
-    const msg = gameStore.endGameMessage.toLowerCase();
-    if (msg.includes('tablas') || msg.includes('empate')) return 0;
-    const iAmWhite = gameStore.myColor === 'w';
-    const whiteWon = msg.includes('blancas ganan') || msg.includes('victoria de las blancas');
-    const blackWon = msg.includes('negras ganan') || msg.includes('victoria de las negras');
-    if (whiteWon) return iAmWhite ? 16 : -16;
-    if (blackWon) return iAmWhite ? -16 : 16;
-    const currentTurn = gameStore.currentFen.split(' ')[1];
-    const isOurTurnAtEnd = currentTurn === gameStore.myColor;
-    return isOurTurnAtEnd ? -16 : 16;
-});
+const startCourtesyTimer = () => {
+    // ✅ Verificamos explícitamente que no sea null
+    if (courtesyInterval !== null) {
+        clearInterval(courtesyInterval);
+        courtesyInterval = null;
+    }
 
-const opponentVisualEloChange = computed(() => {
-    if (gameStore.opponentEloChange !== 0) return gameStore.opponentEloChange;
-    return -myVisualEloChange.value;
-});
+    courtesyCountdown.value = 60;
 
-// 🎯 Handle local move
+    courtesyInterval = setInterval(() => {
+        if (courtesyCountdown.value > 0) {
+            courtesyCountdown.value--;
+        } else {
+            stopCourtesyTimer(); // ✅ Reutilizamos la función de limpieza
+
+            if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
+                console.log("⏱️ Tiempo de cortesía agotado visualmente.");
+            }
+        }
+    }, 1000);
+};
+
+// ✅ 3. Función de parada segura
+const stopCourtesyTimer = () => {
+    if (courtesyInterval !== null) {
+        clearInterval(courtesyInterval);
+        courtesyInterval = null;
+    }
+};
+
+// 🎯 Manejar movimiento local
 const handleLocalMove = (moveInfo: any) => {
-    const canMoveNow = gameStore.gameStarted || gameStore.moveCount === 0;
-    if (gameStore.gameEnded || gameStore.drawOfferedByOpponent || !canMoveNow) return;
+    if (gameStore.gameEnded || gameStore.isPaused || gameStore.drawOfferedByOpponent) return;
 
     const turnInStore = gameStore.currentFen.split(' ')[1];
     if (turnInStore !== gameStore.myColor) {
         console.warn("[Anti-Cheat] No es tu turno de mover.");
         return;
     }
-
-    console.log(`📡 Enviando movimiento oficial al servidor: ${moveInfo.from} -> ${moveInfo.to}`);
 
     socket.emit('make_move', {
         roomId: gameStore.roomId,
@@ -847,299 +392,43 @@ const handleLocalMove = (moveInfo: any) => {
         }
     });
 
-    if (courtesyInterval.value && gameStore.moveCount === 0) {
-        clearInterval(courtesyInterval.value);
-        courtesyInterval.value = null;
-        console.log("⏱️ Timer de cortesía cancelado localmente al hacer el primer movimiento");
-    }
+    stopCourtesyTimer(); // Detener cortesía visual al mover
 };
 
-// 🎯 Socket listeners
-socket.on("move_made", (data: any) => {
-    rivalEstaAFK.value = false;
-    isMeAFK.value = false;
-    mensajeAFK.value = "";
-    afkCountdown.value = 0;
-    afkMessageInitialized.value = false;
-
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-
-    if (localStatusMessage.value.includes('demorando')) {
-        localStatusMessage.value = '';
-        localStatusClass.value = '';
-    }
-    if (opponentStatusMessage.value.includes('inactivo')) {
-        opponentStatusMessage.value = '';
-        opponentStatusClass.value = '';
-    }
-
-    gameStore.currentFen = data.fen;
-    gameStore.moveCount++;
-    gameStore.gameStarted = true;
-    resetTimersAfterMove();
-
-    if (isMyTurn.value) {
-        opponentStatusMessage.value = '';
-        opponentStatusClass.value = '';
-    }
-});
-
-// ✅ ESCUCHAR EVENTO AFK_CLEARED
-socket.on("afk_cleared", () => {
-    rivalEstaAFK.value = false;
-    isMeAFK.value = false;
-    mensajeAFK.value = "";
-    afkCountdown.value = 0;
-    afkMessageInitialized.value = false;
-
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-
-    if (localStatusMessage.value.includes('demorando')) {
-        localStatusMessage.value = '';
-        localStatusClass.value = '';
-    }
-    if (opponentStatusMessage.value.includes('inactivo')) {
-        opponentStatusMessage.value = '';
-        opponentStatusClass.value = '';
-    }
-});
-
-// ✅ ESCUCHAR EVENTO AFK_CLEARED
-socket.on("afk_cleared", () => {
-    rivalEstaAFK.value = false;
-    isMeAFK.value = false;
-    mensajeAFK.value = "";
-    afkCountdown.value = 0;
-    afkMessageInitialized.value = false;
-
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-
-    if (localStatusMessage.value.includes('demorando')) {
-        localStatusMessage.value = '';
-        localStatusClass.value = '';
-    }
-    if (opponentStatusMessage.value.includes('inactivo')) {
-        opponentStatusMessage.value = '';
-        opponentStatusClass.value = '';
-    }
-});
-
-socket.on("player_afk", (data: {
-    afkPlayerColor: 'w' | 'b';
-    message: string;
-    isYou?: boolean;
-    countdownStart?: boolean;
-    countdownTime?: number;
-}) => {
-    const isMyColorAFK = data.afkPlayerColor === gameStore.myColor;
-
-    if (isMyColorAFK && data.isYou) {
-        // ✅ SOY YO el que está AFK
-        isMeAFK.value = true;
-        rivalEstaAFK.value = false;
-
-        if (data.countdownStart && !afkMessageInitialized.value) {
-            mensajeAFK.value = data.message;
-            afkCountdown.value = data.countdownTime || 20;
-            afkMessageInitialized.value = true;
-
-            if (afkCountdownInterval) {
-                clearInterval(afkCountdownInterval);
-                afkCountdownInterval = null;
-            }
-
-            localStatusMessage.value = '⏱️¡Cuidado!';
-            localStatusClass.value = 'status-afk';
-            console.log(`⏱️ Iniciando countdown AFK: ${afkCountdown.value}s`);
-        }
-    } else if (!isMyColorAFK) {
-        // ✅ ES EL RIVAL el que está AFK
-        rivalEstaAFK.value = true;
-        isMeAFK.value = false;
-        mensajeAFK.value = data.message;
-        afkCountdown.value = 0;
-        afkMessageInitialized.value = false;
-
-        if (afkCountdownInterval) {
-            clearInterval(afkCountdownInterval);
-            afkCountdownInterval = null;
-        }
-
-        opponentStatusMessage.value = '⏳ Oponente inactivo';
-        opponentStatusClass.value = 'status-afk';
-    }
-});
-
-// ⏱️ ESCUCHAR ACTUALIZACIONES DEL COUNTDOWN
-socket.on("afk_countdown_update", (data: {
-    timeRemaining: number;
-
-}) => {
-    if (isMeAFK.value && afkMessageInitialized.value) {
-        afkCountdown.value = data.timeRemaining;
-        console.log(`⏱️ Countdown actualizado: ${data.timeRemaining}s`);
-
-    }
-});
-
-socket.on("time_out_confirmed", (data: { winner: string, message: string }) => {
-    gameStore.endGameMessage = data.message;
-    gameStore.gameEnded = true;
-    stopAllTimers();
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
-});
-
-// 📢 Escuchar cuando el oponente ofrece tablas
-socket.on("draw_offered", () => {
-    gameStore.drawOfferedByOpponent = true;
-    opponentStatusMessage.value = `🤝 ${gameStore.opponentNick} ofrece tablas`;
-    opponentStatusClass.value = 'status-draw-offer';
-});
-
-socket.on("draw_offer_canceled", () => {
-    gameStore.drawOfferedByOpponent = false;
-    if (opponentStatusMessage.value.includes('ofrece tablas')) {
-        opponentStatusMessage.value = '';
-        opponentStatusClass.value = '';
-    }
-});
-
-socket.on("draw_accepted", () => {
-    gameStore.drawOfferedByOpponent = false;
-    drawOfferPending.value = false;
-    drawOfferNotification.value = false;
-    localStatusMessage.value = '🤝 Tablas aceptadas';
-    localStatusClass.value = 'status-draw-accepted';
-});
-
-socket.on("game_started", (data: any) => {
-    console.log("⚔️ ¡EVENTO GAME_STARTED DETECTADO!", data);
-    const authStore = useAuthStore();
-    const nick = authStore.isAuthenticated ? authStore.currentNick : gameStore.nick;
-
-    sessionStorage.setItem('game_room_id', data.roomId);
-    sessionStorage.setItem('game_player_nick', nick);
-    sessionStorage.setItem('game_my_color', gameStore.myColor || '');
-
-    gameStore.roomId = data.roomId;
-    gameStore.currentFen = data.fen;
-    gameStore.whiteTime = data.white.time;
-    gameStore.blackTime = data.black.time;
-    gameStore.selectedMinutes = data.initialTime / 60;
-
-    if (data.white.id === socket.id) {
-        gameStore.myColor = 'w';
-        gameStore.opponentNick = data.black.nick;
-        gameStore.opponentElo = 0;
-        console.log("🟢 Asignado: Eres BLANCAS");
-
-        if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
-            startCourtesyTimer();
-        }
-    } else if (data.black.id === socket.id) {
-        gameStore.myColor = 'b';
-        gameStore.opponentNick = data.white.nick;
-        gameStore.opponentElo = 0;
-        console.log("🔴 Asignado: Eres NEGRAS");
-    }
-
-    gameStore.gameStarted = true;
-    socket.emit('game_start_confirmed', { roomId: data.roomId });
-});
-
-// ⏱️ Cuando el juego termina, limpiar todo
-socket.on('game_over', (data: {
-    reason: string;
-    loserSocketId?: string;
-    message: string;
-    winnerMessage?: string;
-    loserMessage?: string;
-}) => {
-    gameStore.gameEnded = true;
-
-    if (data.winnerMessage && data.loserMessage) {
-        if (socket.id !== data.loserSocketId) {
-            gameStore.endGameMessage = data.winnerMessage;
-        } else {
-            gameStore.endGameMessage = data.loserMessage;
-        }
-    } else {
-        gameStore.endGameMessage = data.message;
-    }
-
-    // ✅ Limpiar todos los estados
-    rivalEstaAFK.value = false;
-    isMeAFK.value = false;
-    mensajeAFK.value = "";
-    afkCountdown.value = 0;
-    afkMessageInitialized.value = false;
-
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-
-    stopAllTimers();
-    timeWarningActive.value = false;
-    timeWarningCountdown.value = 0;
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
-});
-
-// ⏱️ Formateador de tiempo
-const formatTime = (seconds: number) => {
-    if (!gameStore.gameStarted) {
-        const initialMinutes = gameStore.selectedMinutes;
-        return `${initialMinutes.toString().padStart(2, '0')}:00`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
-
-// 🎯 Acciones de botones
+// 📢 Acciones de botones
 const surrender = () => {
     if (confirm('¿Seguro que deseas abandonar la partida?')) {
         socket.emit('surrender', { roomId: gameStore.roomId });
-        stopAllTimers();
-        localStatusMessage.value = '';
-        opponentStatusMessage.value = '';
     }
 };
 
+const offerDraw = () => {
+    if (drawOfferPending.value) return;
+    drawOfferPending.value = true;
+    drawOfferNotification.value = true;
+    socket.emit('offer_draw', { roomId: gameStore.roomId });
+
+    // Auto-cancelar oferta visualmente después de 30s si no hay respuesta
+    setTimeout(() => {
+        if (drawOfferPending.value) cancelDrawOffer();
+    }, 30000);
+};
+
+const cancelDrawOffer = () => {
+    drawOfferPending.value = false;
+    drawOfferNotification.value = false;
+    socket.emit('cancel_draw_offer', { roomId: gameStore.roomId });
+};
+
 const acceptDraw = () => {
-    gameStore.drawOfferedByOpponent = false;
     socket.emit('accept_draw', { roomId: gameStore.roomId });
-    stopAllTimers();
-    localStatusMessage.value = '🤝 Has aceptado las tablas';
-    localStatusClass.value = 'status-draw-accepted';
 };
 
 const exitGame = () => {
-    stopAllTimers();
-    drawOfferPending.value = false;
-    drawOfferNotification.value = false;
-    localStatusMessage.value = '';
-    opponentStatusMessage.value = '';
     gameStore.resetGame();
-    // ✅ Limpiar sessionStorage
-    sessionStorage.removeItem('game_room_id');
-    sessionStorage.removeItem('game_player_nick');
-    sessionStorage.removeItem('game_my_color');
     router.push('/');
 };
 
-// 🎯 Funciones de rematch
 const requestRematch = () => {
     gameStore.iRequestedRematch = true;
     socket.emit('propose_rematch', { roomId: gameStore.roomId });
@@ -1160,13 +449,9 @@ const acceptRematch = () => {
 };
 
 const rematchGame = () => {
-    const currentNick = gameStore.nick;
-    const currentMinutes = gameStore.selectedMinutes;
-    stopAllTimers();
-    drawOfferPending.value = false;
-    drawOfferNotification.value = false;
+    const currentNick = authStore.isAuthenticated ? authStore.currentNick : gameStore.nick;
     gameStore.resetGame();
-    gameStore.searchGame(currentNick, gameStore.elo, currentMinutes);
+    gameStore.searchGame(currentNick, authStore.currentElo || gameStore.elo, gameStore.selectedMinutes);
     router.push('/');
 };
 
@@ -1175,130 +460,120 @@ const goToRegister = () => {
     sessionStorage.setItem('guest_backup_elo', gameStore.elo.toString());
     router.push('/register');
 };
+// ⏱️ Formateador de tiempo (MM:SS)
+const formatTime = (seconds: number): string => {
+    if (!gameStore.gameStarted) {
+        const initialMinutes = gameStore.selectedMinutes;
+        return `${initialMinutes.toString().padStart(2, '0')}:00`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
 
+// 💡 Computed para mostrar cambios de Elo visualmente
+const myVisualEloChange = computed(() => {
+    if (gameStore.eloChange !== 0) return gameStore.eloChange;
+    const msg = gameStore.endGameMessage.toLowerCase();
+    if (msg.includes('tablas') || msg.includes('empate') || msg.includes('abortada')) return 0;
+    // Si no hay datos de Elo, asumimos victoria/derrota según el mensaje
+    if (msg.includes('victoria') || msg.includes('gana')) return 16;
+    if (msg.includes('derrota') || msg.includes('pierde')) return -16;
+    return 0;
+});
+
+const opponentVisualEloChange = computed(() => {
+    if (gameStore.opponentEloChange !== 0) return gameStore.opponentEloChange;
+    return -myVisualEloChange.value;
+});
+
+// 🎮 Función para "Nueva Partida" (usuarios autenticados)
 const handlePlay = () => {
     if (authStore.isAuthenticated) {
         gameStore.cancelSearch();
         const lastSelectedMinutes = gameStore.selectedMinutes;
-        stopAllTimers();
-        drawOfferPending.value = false;
-        drawOfferNotification.value = false;
         gameStore.resetGame();
         router.push('/');
-        gameStore.searchGame(authStore.currentNick, authStore.currentElo, lastSelectedMinutes);
+        setTimeout(() => {
+            gameStore.searchGame(
+                authStore.currentNick,
+                authStore.currentElo,
+                lastSelectedMinutes
+            );
+        }, 100);
     }
 };
+// ✅ Watchers para reaccionar a cambios del store (En lugar de socket.on duplicados)
+watch(() => gameStore.moveCount, (newCount) => {
+    if (newCount === 1) {
+        stopCourtesyTimer();
+    }
+});
 
-// ⏱️ Watchers
+watch(() => gameStore.gameEnded, (ended) => {
+    if (ended) {
+        stopCourtesyTimer();
+        drawOfferPending.value = false;
+        drawOfferNotification.value = false;
+    }
+});
 watch(
-    () => gameStore.moveCount,
-    (newCount) => {
-        if (newCount === 1) {
-            if (courtesyInterval.value) {
-                clearInterval(courtesyInterval.value);
-                courtesyInterval.value = null;
-            }
-            startPlayerTimer();
+    () => gameStore.currentFen,
+    (newFen, oldFen) => {
+        if (!boardAPI.value || !newFen || !oldFen) {
+            return;
         }
+
+        const turn = newFen.split(" ")[1];
+
+        const isOpponentMove = turn === gameStore.myColor;
+
+        if (isOpponentMove) {
+            // ✅ setConfig permite pasar fen + lastMove juntos, así el
+            // tablero resalta la casilla de origen/destino del oponente.
+            // (setPosition solo acepta el fen y por eso el resaltado se perdía)
+            boardAPI.value.setConfig({
+                fen: newFen,
+                lastMove: formattedLastMove.value,
+            });
+        }
+
+        shouldAnimate.value = isOpponentMove;
+
+        setTimeout(() => {
+            shouldAnimate.value = true;
+        }, 300);
     }
 );
+// ✅ Detectar recarga de página
+onBeforeMount(() => {
+    const savedRoomId = sessionStorage.getItem('game_room_id');
+    const savedNick = sessionStorage.getItem('game_player_nick');
+    const savedColor = sessionStorage.getItem('game_my_color');
 
-watch(
-    () => gameStore.roomId,
-    (newRoomId, oldRoomId) => {
-        if (newRoomId && newRoomId !== oldRoomId) {
-            console.log("🔄 Nueva sala detectada. Reiniciando contadores...");
-            stopAllTimers();
-            drawOfferPending.value = false;
-            drawOfferNotification.value = false;
-            localStatusMessage.value = '';
-            opponentStatusMessage.value = '';
-            courtesyCountdown.value = 60;
-            rivalEstaAFK.value = false;
-            isMeAFK.value = false;
-            mensajeAFK.value = "";
-            afkCountdown.value = 0;
-
-            if (gameStore.myColor === 'w') {
-                gameStore.whiteTime = gameStore.selectedMinutes * 60;
-                gameStore.blackTime = gameStore.selectedMinutes * 60;
-            }
-            startCourtesyTimer();
+    if (savedRoomId && savedNick && !gameStore.gameStarted && !gameStore.gameEnded) {
+        gameStore.roomId = savedRoomId;
+        gameStore.nick = savedNick;
+        if (savedColor === 'w' || savedColor === 'b') {
+            gameStore.myColor = savedColor as 'w' | 'b';
+        }
+        // El socketService.ts se encargará de emitir 'reconnect_to_room' al conectarse
+        if (!socket.connected) {
+            socket.connect();
         }
     }
-);
+});
 
-watch(
-    () => gameStore.gameEnded,
-    (ended) => {
-        if (ended) {
-            stopAllTimers();
-            drawOfferPending.value = false;
-            drawOfferNotification.value = false;
-            localStatusMessage.value = '';
-            opponentStatusMessage.value = '';
-            rivalEstaAFK.value = false;
-            isMeAFK.value = false;
-            mensajeAFK.value = "";
-            afkCountdown.value = 0;
-        }
-    }
-);
-
-// Lifecycle hooks
 onMounted(() => {
-    initTimeWarningListener();
-    if (!isReconnecting.value) {
-        if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
-            startCourtesyTimer();
-        }
-        if (gameStore.moveCount > 0 && !gameStore.gameEnded) {
-            startPlayerTimer();
-        }
+    if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
+        startCourtesyTimer();
     }
-    // ✅ Limpiar estado de reconexión al montar
-    gameStore.isReconnecting = false;
-    gameStore.isPaused = false;
-    gameStore.opponentDisconnected = false;
-
-    
-
 });
 
 onUnmounted(() => {
-
-    stopAllTimers();
-    resetReconnectionState();
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-    afkMessageInitialized.value = false;
-    if (afkCountdownInterval) {
-        clearInterval(afkCountdownInterval);
-        afkCountdownInterval = null;
-    }
-    afkMessageInitialized.value = false;
-
-    // ✅ Limpiar todos los listeners
-    socket.off('clock_update');
-    socket.off('time_warning');
-    socket.off('afk_countdown_update');
-    socket.off('afk_cleared');
-    socket.off('reconnect_success');
-    socket.off('reconnect_failed');
-    socket.off('game_state_sync');
-    socket.off('game_resumed');
-    socket.off('player_disconnected');
-    socket.off('bot_joined');
-
-    if (drawOfferPending.value) {
-        socket.emit('cancel_draw_offer', { roomId: gameStore.roomId });
-    }
-
+    // ✅ SOLO limpiamos timers locales. NUNCA uses socket.off() aquí.
+    stopCourtesyTimer();
 });
-
-
 </script>
 
 <style scoped>
@@ -1341,7 +616,7 @@ onUnmounted(() => {
     transform: translateX(-50%);
     z-index: 40;
     display: flex;
-   align-items: baseline;
+    align-items: baseline;
     gap: 4px;
     padding: 12px 24px;
     background: rgba(56, 189, 248, 0.25);
@@ -1672,13 +947,37 @@ onUnmounted(() => {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 60, 60, 0.4);
-    border-radius: 8px;
+    border-radius: 6px;
     color: #ff6b6b;
-    font-weight: 500;
-    font-size: 0.85rem;
-    animation: pulse-warning 1s infinite alternate;
-    pointer-events: none;
-    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+/* Resalto de la última jugada (Verde oliva translúcido estilo Lichess) */
+:deep(.cg-wrap square.last-move) {
+    background-color: rgba(155, 199, 0, 0.41) !important;
+}
+
+/* Resalto del rey en jaque (Gradiente rojo difuminado) */
+:deep(.cg-wrap square.check) {
+    background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.65) 0%, rgba(255, 0, 0, 0) 70%) !important;
+}
+
+/* Resalto de casilla seleccionada al hacer click en una pieza */
+:deep(.cg-wrap square.selected) {
+    background-color: rgba(20, 85, 30, 0.5) !important;
+}
+
+/* Destinos posibles (puntos de movimiento) */
+:deep(.cg-wrap g.dots circle) {
+    fill: rgba(20, 85, 30, 0.3) !important;
+}
+
+/* Destinos posibles sobre piezas que puedes capturar (aro alrededor de la pieza) */
+:deep(.cg-wrap g.dots circle.capture) {
+    stroke: rgba(20, 85, 30, 0.6) !important;
+    stroke-width: 0.0625;
+    fill: none !important;
 }
 
 @media (max-width: 768px) {

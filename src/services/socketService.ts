@@ -15,55 +15,29 @@ export const socket: Socket = io("http://localhost:4000", {
 });
 
 // ✅ Variables de reconexión
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10; // ✅ Aumentado a 10
-let reconnectTimer: NodeJS.Timeout | null = null;
+
+
 let isReconnecting = false;
 
 // ✅ Función para resetear el estado de reconexión
-const resetReconnectionState = () => {
-  reconnectAttempts = 0;
-  isReconnecting = false;
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
+const resetReconnectionState = () => { 
+  isReconnecting = false; 
 };
 
 // ✅ Función para intentar reconectar
 const attemptReconnection = (roomId: string, nick: string) => {
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.log(
-      `❌ [Socket] Máximos intentos de reconexión alcanzados (${MAX_RECONNECT_ATTEMPTS})`,
-    );
-    resetReconnectionState();
-    return;
-  }
+  if (isReconnecting) return; // Evitar emisiones duplicadas
 
-  reconnectAttempts++;
   isReconnecting = true;
   console.log(
-    `🔄 [Socket] Intento ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} de reconexión a sala ${roomId} con nick ${nick}`,
+    `🔄 [Socket] Solicitando reconexión a sala ${roomId} como ${nick}`,
   );
 
+  // Emitimos UNA VEZ. El backend responderá con "reconnect_success" o "reconnect_failed"
   socket.emit("reconnect_to_room", {
     roomId: roomId,
     nick: nick,
   });
-
-  // ✅ Si falla, intentar de nuevo después de 3 segundos
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  reconnectTimer = setTimeout(() => {
-    if (isReconnecting && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      attemptReconnection(roomId, nick);
-    } else {
-      resetReconnectionState();
-    }
-  }, 1000);
 };
 
 // ✅ Escuchar eventos del servidor
@@ -107,19 +81,17 @@ socket.on(
 socket.on("connect", () => {
   const gameStore = useGameStore();
   gameStore.isConnected = true;
-  console.log("🔌 Socket conectado");
+  console.log("🔌 Socket conectado. Nuevo Socket ID:", socket.id);
 
-  // ✅ Verificar si hay una sala guardada en sessionStorage
   const savedRoomId = sessionStorage.getItem("game_room_id");
   const savedNick = sessionStorage.getItem("game_player_nick");
 
   if (savedRoomId && savedNick && !gameStore.gameEnded && !isReconnecting) {
     console.log(
-      `🔄 [Socket] Detectada sala guardada, intentando reconectar a ${savedRoomId}`,
+      `🔄 [Socket] Detectada sala guardada, solicitando reconexión...`,
     );
     attemptReconnection(savedRoomId, savedNick);
   } else if (savedRoomId && savedNick && gameStore.gameEnded) {
-    // ✅ Si la partida ya terminó, limpiar sessionStorage
     sessionStorage.removeItem("game_room_id");
     sessionStorage.removeItem("game_player_nick");
     sessionStorage.removeItem("game_my_color");
@@ -161,31 +133,6 @@ socket.on(
     console.log("🎮 Partida reanudada");
   },
 );
-
-// ✅ Escuchar cuando la reconexión falla
-socket.on("reconnect_failed", (data: { message: string }) => {
-  console.log("❌ [Socket] Reconexión fallida:", data.message);
-
-  // ✅ Si aún hay intentos, no declarar game_over todavía
-  if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-    console.log(
-      `🔄 [Socket] Reintentando... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
-    );
-    return;
-  }
-
-  resetReconnectionState();
-  const gameStore = useGameStore();
-  gameStore.isReconnecting = false;
-  gameStore.gameEnded = true;
-  gameStore.endGameMessage =
-    data.message || "Perdiste por abandono (desconexión).";
-
-  // ✅ Limpiar sessionStorage
-  sessionStorage.removeItem("game_room_id");
-  sessionStorage.removeItem("game_player_nick");
-  sessionStorage.removeItem("game_my_color");
-});
 
 // ✅ Escuchar desconexión
 socket.on("disconnect", (reason) => {
@@ -286,13 +233,57 @@ socket.on("receive_message", (messageData) => {
   gameStore.messages.push(messageData);
 });
 
-// 🚨 Capturar la advertencia de los últimos 20 segundos de inactividad
-socket.on("inactivity_warning", (data: { secondsLeft: number }) => {
-  console.warn(
-    `⚠️ ¡Atención! Te quedan ${data.secondsLeft} segundos para mover o perderás por abandono.`,
-  );
-});
+socket.on(
+  "player_afk",
+  (data: {
+    afkPlayerColor: string;
+    message: string;
+    isYou: boolean;
+    countdownStart?: boolean;
+    countdownTime?: number;
+  }) => {
+    const gameStore = useGameStore();
+    if (data.isYou) {
+      gameStore.afkWarning = data.message;
+      if (data.countdownStart) {
+        gameStore.afkCountdown = data.countdownTime || 20;
+      }
+    } else {
+      gameStore.opponentAfkMessage = data.message;
+    }
+  },
+);
 
+socket.on(
+  "afk_countdown_update",
+  (data: { timeRemaining: number; message: string }) => {
+    const gameStore = useGameStore();
+    gameStore.afkCountdown = data.timeRemaining;
+    gameStore.afkWarning = data.message;
+  },
+);
+// ✅ 1. Cuando un Bot se une a la sala (para actualizar la UI con su nombre y Elo)
+socket.on(
+  "bot_joined",
+  (data: { nick: string; elo: number; color: string; difficulty: string }) => {
+    console.log(`🤖 Bot unido a la partida: ${data.nick} (${data.elo} Elo)`);
+    const gameStore = useGameStore();
+    const opponentColor = gameStore.myColor === "w" ? "b" : "w";
+
+    if (data.color === opponentColor) {
+      gameStore.opponentNick = data.nick;
+      gameStore.opponentElo = data.elo;
+      gameStore.isBotOpponent = true;
+    }
+  },
+);
+
+// ✅ 2. Cuando el oponente cancela su oferta de tablas
+socket.on("draw_offer_canceled", () => {
+  console.log("❌ El oponente canceló su oferta de tablas.");
+  const gameStore = useGameStore();
+  gameStore.drawOfferedByOpponent = false;
+});
 socket.on(
   "game_over",
   (data: {
@@ -311,11 +302,6 @@ socket.on(
     gameStore.opponentDisconnected = false;
     gameStore.opponentDisconnectedMessage = "";
 
-    // ✅ Actualizar cambios de Elo
-    if (data.whiteEloChange !== undefined) {
-      gameStore.eloChange = data.whiteEloChange;
-      gameStore.opponentEloChange = data.blackEloChange || 0;
-    }
     // ✅ Resetear estado de reconexión
     resetReconnectionState();
 
@@ -357,6 +343,25 @@ socket.on(
           "Partida Abortada: No se alteró la puntuación.";
       } else {
         gameStore.endGameMessage = data.message;
+      }
+    }
+    // ✅ ACTUALIZAR ELO (si viene en los datos)
+    // Solo asignar si no es un aborto
+    if (data.reason !== "aborted" && data.reason !== "abort_by_inactivity") {
+      if (
+        data.whiteEloChange !== undefined &&
+        data.blackEloChange !== undefined
+      ) {
+        const gameStore = useGameStore();
+
+        // ✅ CORREGIDO: Asignar el cambio de Elo según el color del jugador local
+        if (gameStore.myColor === "w") {
+          gameStore.eloChange = data.whiteEloChange;
+          gameStore.opponentEloChange = data.blackEloChange;
+        } else {
+          gameStore.eloChange = data.blackEloChange;
+          gameStore.opponentEloChange = data.whiteEloChange;
+        }
       }
     }
     console.log(`🏁 Partida terminada: ${gameStore.endGameMessage}`);
