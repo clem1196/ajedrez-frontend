@@ -2,17 +2,20 @@
 import { Server } from 'socket.io';
 
 export const initSocketServer = (server: any) => {
-  // Lista de orígenes permitidos para WebSockets
-  const allowedOrigins = [
-    process.env.CORS_ORIGIN, // https://ajedrez-frontend.vercel.app
-    "http://localhost:5173",  // Vite local
-    "http://localhost:3000"
-  ];
-
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin) return callback(null, true);
+
+        const allowedOrigins = [
+          process.env.CORS_ORIGIN,
+          'http://localhost:5173',
+          'http://localhost:3000'
+        ];
+
+        const isVercelPreview = origin.endsWith('.vercel.app');
+
+        if (allowedOrigins.includes(origin) || isVercelPreview) {
           callback(null, true);
         } else {
           callback(new Error(`WebSocket CORS bloqueado para: ${origin}`));
