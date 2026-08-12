@@ -4,8 +4,13 @@ import { useGameStore } from "../stores/gameStore";
 import { useAuthStore } from "../stores/authStore";
 import router from "@/router";
 
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL?.replace(/\/api$/, "") ||
+  "http://localhost:4000";
+
 // ✅ Configuración de socket con reconexión automática
-export const socket: Socket = io("http://localhost:4000", {
+export const socket: Socket = io(SOCKET_URL, {
   autoConnect: false,
   reconnection: true,
   reconnectionAttempts: 10,
@@ -16,12 +21,11 @@ export const socket: Socket = io("http://localhost:4000", {
 
 // ✅ Variables de reconexión
 
-
 let isReconnecting = false;
 
 // ✅ Función para resetear el estado de reconexión
-const resetReconnectionState = () => { 
-  isReconnecting = false; 
+const resetReconnectionState = () => {
+  isReconnecting = false;
 };
 
 // ✅ Función para intentar reconectar
@@ -368,7 +372,7 @@ socket.on(
       // ⚡ ACTUALIZACIÓN REALTIME DEL ELO EN EL AUTHSTORE / PERFIL
       if (authStore.user && data.players && data.players.length > 0) {
         const myMatchData = data.players.find(
-          (p) => p.nick === authStore.user?.nick
+          (p) => p.nick === authStore.user?.nick,
         );
 
         if (myMatchData) {
@@ -388,7 +392,7 @@ socket.on(
           }
 
           console.log(
-            `📈 [EloSync] Elo actualizado reactivamente en el cliente: ${myMatchData.newElo}`
+            `📈 [EloSync] Elo actualizado reactivamente en el cliente: ${myMatchData.newElo}`,
           );
         }
       }
