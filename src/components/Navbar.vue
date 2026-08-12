@@ -7,34 +7,62 @@
     </div>
 
     <div class="nav-actions">
-      <!-- 💡 Si está autenticado, muestra su Nick, Elo y el botón de Salir -->
+      <!-- 💡 Si está autenticado -->
       <div v-if="authStore.isAuthenticated" class="user-session-info">
-        <button v-if="authStore.isAdmin" class="btn-admin-glass" @click="router.push('/admin')">
-          ⚙️ Admin
+        
+        <!-- Botón Admin -->
+        <button 
+          v-if="authStore.isAdmin" 
+          class="btn-admin-glass" 
+          @click="router.push('/admin')"
+          data-tooltip="Panel Admin"
+        >
+          <span class="btn-icon">⚙️</span>
+          <span class="btn-text">Admin</span>
         </button>
-        <button class="btn-ranking-glass" @click="goToRanking">
-          🏆 Ranking
+
+        <!-- Botón Ranking -->
+        <button 
+          class="btn-ranking-glass" 
+          @click="goToRanking"
+          data-tooltip="Ver Ranking"
+        >
+          <span class="btn-icon">🏆</span>
+          <span class="btn-text">Ranking</span>
         </button>
+
+        <!-- User Pill / Estadísticas -->
         <div class="user-pill">
-          <span class="pill-nick">👤 {{ authStore.currentNick }}</span>
+          <span class="pill-nick">👤 <span class="pill-nick-text">{{ authStore.currentNick }}</span></span>
           <span class="pill-elo">({{ authStore.currentElo }} Elo)</span>
           <span class="pill-stats">
-            🏅 {{ authStore.userStats?.wins || 0 }}W
-            {{ authStore.userStats?.losses || 0 }}L
+            🏅 {{ authStore.userStats?.wins || 0 }}W {{ authStore.userStats?.losses || 0 }}L
           </span>
         </div>
-        <button class="btn-logout-glass" @click="handleLogout">
-          🚪 Cerrar Sesión
+
+        <!-- Botón Logout -->
+        <button 
+          class="btn-logout-glass" 
+          @click="handleLogout"
+          data-tooltip="Cerrar Sesión"
+        >
+          <span class="btn-icon">🚪</span>
+          <span class="btn-text">Cerrar Sesión</span>
         </button>
       </div>
 
-      <!-- 🔑 Si es invitado, muestra el indicador y el botón de Iniciar Sesión -->
+      <!-- 🔑 Si es invitado -->
       <div v-else class="guest-session-info">
         <div class="guest-pill">
-          ⚡ Modo Invitado
+          ⚡ <span class="guest-pill-text">Modo Invitado</span>
         </div>
-        <button class="btn-login-glass" @click="router.push('/login')">
-          🔑 Iniciar Sesión
+        <button 
+          class="btn-login-glass" 
+          @click="router.push('/login')"
+          data-tooltip="Iniciar Sesión"
+        >
+          <span class="btn-icon">🔑</span>
+          <span class="btn-text">Iniciar Sesión</span>
         </button>
       </div>
     </div>
@@ -61,37 +89,9 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-/* ✅ Estilo para botón de Admin */
-.btn-admin-glass {
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  border: 1px solid transparent;
-  white-space: nowrap;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 165, 0, 0.08);
-  border-color: rgba(255, 165, 0, 0.2);
-  color: #fbbf24;
-}
-
-.btn-admin-glass:hover {
-  background: rgba(255, 165, 0, 0.18);
-  box-shadow: 0 0 16px rgba(255, 165, 0, 0.12);
-  transform: translateY(-1px);
-  border-color: rgba(255, 165, 0, 0.3);
-}
-.pill-stats {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  margin-left: 4px;
-}
-
+/* ==========================================================================
+   ESTILOS BASE
+   ========================================================================== */
 .navbar-glass {
   display: flex;
   justify-content: space-between;
@@ -147,7 +147,7 @@ const handleLogout = () => {
   gap: 12px;
 }
 
-/* ✅ Badge del usuario autenticado */
+/* User Pill */
 .user-pill {
   display: flex;
   align-items: center;
@@ -168,6 +168,9 @@ const handleLogout = () => {
 .pill-nick {
   color: #fff;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .pill-elo {
@@ -176,7 +179,12 @@ const handleLogout = () => {
   font-size: 0.8rem;
 }
 
-/* ✅ Badge del modo invitado */
+.pill-stats {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
 .guest-pill {
   font-size: 0.8rem;
   color: #64748b;
@@ -186,12 +194,17 @@ const handleLogout = () => {
   border: 1px solid rgba(255, 255, 255, 0.04);
   font-weight: 500;
   letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-/* ✅ Botones estilo glassmorphism - Versión unificada */
+/* Botones Glass Unificados */
+.btn-admin-glass,
 .btn-ranking-glass,
 .btn-login-glass,
 .btn-logout-glass {
+  position: relative;
   padding: 6px 14px;
   border-radius: 8px;
   font-size: 0.8rem;
@@ -203,7 +216,18 @@ const handleLogout = () => {
   height: 34px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.btn-admin-glass {
+  background: rgba(255, 165, 0, 0.08);
+  border-color: rgba(255, 165, 0, 0.2);
+  color: #fbbf24;
+}
+.btn-admin-glass:hover {
+  background: rgba(255, 165, 0, 0.18);
+  box-shadow: 0 0 16px rgba(255, 165, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .btn-ranking-glass {
@@ -211,12 +235,10 @@ const handleLogout = () => {
   border-color: rgba(255, 255, 255, 0.06);
   color: #cbd5e1;
 }
-
 .btn-ranking-glass:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .btn-login-glass {
@@ -224,12 +246,10 @@ const handleLogout = () => {
   border-color: rgba(56, 189, 248, 0.2);
   color: #38bdf8;
 }
-
 .btn-login-glass:hover {
   background: rgba(56, 189, 248, 0.18);
   box-shadow: 0 0 16px rgba(56, 189, 248, 0.12);
   transform: translateY(-1px);
-  border-color: rgba(56, 189, 248, 0.3);
 }
 
 .btn-logout-glass {
@@ -237,32 +257,51 @@ const handleLogout = () => {
   border-color: rgba(239, 68, 68, 0.15);
   color: #f87171;
 }
-
 .btn-logout-glass:hover {
   background: rgba(239, 68, 68, 0.15);
   box-shadow: 0 0 16px rgba(239, 68, 68, 0.08);
   transform: translateY(-1px);
-  border-color: rgba(239, 68, 68, 0.25);
 }
 
-/* ✅ Responsive para móviles */
+/* ==========================================================================
+   OPTIMIZACIÓN RESPONSIVA EN MÓVILES (< 768px y < 480px)
+   ========================================================================== */
 @media (max-width: 768px) {
   .navbar-glass {
     padding: 0 12px;
-    height: 56px;
-  }
-
-  .brand-name {
-    font-size: 0.9rem;
-  }
-
-  .brand-logo {
-    font-size: 1.3rem;
+    height: 52px;
   }
 
   .user-session-info,
   .guest-session-info {
-    gap: 8px;
+    gap: 6px;
+  }
+
+  /* Oculta los textos de los botones */
+  .btn-text,
+  .guest-pill-text {
+    display: none;
+  }
+
+  /* Convierte botones en cuadrados/círculos compactos */
+  .btn-admin-glass,
+  .btn-ranking-glass,
+  .btn-login-glass,
+  .btn-logout-glass {
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .btn-icon {
+    font-size: 0.95rem;
+  }
+
+  /* Mantiene nick y Elo pero reduce las estadísticas complejas */
+  .pill-stats {
+    display: none;
   }
 
   .user-pill {
@@ -270,64 +309,66 @@ const handleLogout = () => {
     font-size: 0.75rem;
   }
 
-  .pill-elo {
-    font-size: 0.7rem;
-  }
-
-  .guest-pill {
-    font-size: 0.7rem;
+  /* Tooltips al pasar el mouse en móviles/tablets */
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #181920;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
     padding: 4px 8px;
-  }
-
-  .btn-ranking-glass,
-  .btn-login-glass,
-  .btn-logout-glass {
-    padding: 4px 10px;
-    font-size: 0.7rem;
-    height: 30px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    z-index: 120;
+    pointer-events: none;
+    animation: tooltipFade 0.2s ease forwards;
   }
 }
 
 @media (max-width: 480px) {
   .navbar-glass {
     padding: 0 8px;
-    height: 50px;
+    height: 48px;
   }
 
   .brand-name {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .brand-logo {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
+  }
+
+  /* En pantallas muy pequeñas, oculta el Nick pero deja el Elo */
+  .pill-nick-text {
+    display: none;
   }
 
   .user-pill {
     padding: 3px 8px;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 
-  .pill-elo {
-    font-size: 0.6rem;
-  }
-
+  .btn-admin-glass,
   .btn-ranking-glass,
   .btn-login-glass,
   .btn-logout-glass {
-    padding: 3px 8px;
-    font-size: 0.65rem;
-    height: 26px;
-    border-radius: 6px;
+    width: 28px;
+    height: 28px;
   }
 
-  .guest-pill {
-    font-size: 0.6rem;
-    padding: 3px 6px;
+  .btn-icon {
+    font-size: 0.85rem;
   }
+}
 
-  .user-session-info,
-  .guest-session-info {
-    gap: 4px;
-  }
+@keyframes tooltipFade {
+  from { opacity: 0; transform: translate(-50%, -4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 </style>

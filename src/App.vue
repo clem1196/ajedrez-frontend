@@ -21,6 +21,10 @@ onMounted(() => {
 });
 </script>
 <style>
+ .main-content {
+    display: flex;
+    justify-content: center;
+   }
 /* Estilos globales para quitar márgenes por defecto y poner fondo oscuro */
 html, body {
   margin: 0;

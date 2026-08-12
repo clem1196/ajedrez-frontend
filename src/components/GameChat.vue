@@ -2,60 +2,42 @@
 <template>
   <div class="chat-wrapper glass-card">
     <div class="chat-header">
-      <span>🗣️ Chat de Partida</span>
+      <span>🗣️ Chat</span>
       <span v-if="gameStore.opponentNick" class="chat-opponent">
-        con {{ gameStore.opponentNick }}
-        <span v-if="gameStore.isBotOpponent" class="bot-badge">🤖</span>
+        <!-- con {{ gameStore.opponentNick }}-->
+        <span v-if="gameStore.isBotOpponent" class="bot-badge"></span>
       </span>
     </div>
 
     <div class="chat-messages" ref="messagesContainer">
       <!-- ✅ Mensajes del sistema -->
-      <div 
-        v-for="msg in gameStore.systemMessages" 
-        :key="msg.id" 
-        class="chat-bubble-row system-message"
-      >
+      <div v-for="msg in gameStore.systemMessages" :key="msg.id" class="chat-bubble-row system-message">
         <div class="chat-bubble system-bubble">
           <p class="message-text">{{ msg.text }}</p>
           <span class="message-time">{{ msg.timestamp }}</span>
         </div>
       </div>
-      
+
       <!-- ✅ Mensajes de chat -->
-      <div 
-        v-for="msg in gameStore.messages" 
-        :key="msg.id" 
-        class="chat-bubble-row"
-        :class="{ 'is-me': msg.sender === authStore.currentNick || msg.sender === gameStore.nick }"
-      >
+      <div v-for="msg in gameStore.messages" :key="msg.id" class="chat-bubble-row"
+        :class="{ 'is-me': msg.sender === authStore.currentNick || msg.sender === gameStore.nick }">
         <div class="chat-bubble">
           <span class="sender-name">{{ msg.sender }}</span>
           <p class="message-text">{{ msg.text }}</p>
           <span class="message-time">{{ msg.timestamp }}</span>
         </div>
       </div>
-      
+
       <div v-if="gameStore.messages.length === 0 && gameStore.systemMessages.length === 0" class="empty-chat">
         <span>💬 Sin mensajes aún</span>
       </div>
     </div>
 
     <form @submit.prevent="sendMessage" class="chat-input-row">
-      <input 
-        v-model="newMessage" 
-        type="text" 
-        placeholder="Escribe un mensaje..." 
-        maxlength="200"
-        :disabled="!gameStore.roomId || gameStore.gameEnded"
-        autocomplete="off"
-        @keydown="handleKeydown"
-      />
-      <button 
-        type="submit" 
-        class="btn-send-glass" 
-        :disabled="!newMessage.trim() || !gameStore.roomId || gameStore.gameEnded"
-      >
+      <input v-model="newMessage" type="text" placeholder="Escribe un mensaje..." maxlength="200"
+        :disabled="!gameStore.roomId || gameStore.gameEnded" autocomplete="off" @keydown="handleKeydown" />
+      <button type="submit" class="btn-send-glass"
+        :disabled="!newMessage.trim() || !gameStore.roomId || gameStore.gameEnded">
         ▶️
       </button>
     </form>
@@ -75,7 +57,7 @@ const messagesContainer = ref<HTMLElement | null>(null);
 const sendMessage = () => {
   const text = newMessage.value.trim();
   if (!text || !gameStore.roomId || gameStore.gameEnded) return;
-  
+
   gameStore.sendChatMessage(text);
   newMessage.value = '';
 };
@@ -111,6 +93,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .system-message {
   justify-content: center !important;
 }
+
 .system-bubble {
   background: rgba(56, 189, 248, 0.08) !important;
   border: 1px solid rgba(56, 189, 248, 0.1) !important;
@@ -127,12 +110,13 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 .bot-badge {
   font-size: 0.7rem;
-  background: rgba(56, 189, 248, 0.15);
+  /*background: rgba(56, 189, 248, 0.15);*/
   padding: 1px 6px;
   border-radius: 4px;
   margin-left: 4px;
   color: #38bdf8;
 }
+
 .chat-wrapper {
   display: flex;
   flex-direction: column;
@@ -140,9 +124,11 @@ const handleKeydown = (e: KeyboardEvent) => {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
-  height: 400px; /* Puedes ajustarlo al alto de tu tablero */
+  height: 200px;
+  /* Puedes ajustarlo al alto de tu tablero */
   width: 300px;
   overflow: hidden;
+  margin-left: 6px;
 }
 
 .chat-header {
@@ -167,6 +153,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .chat-messages::-webkit-scrollbar {
   width: 4px;
 }
+
 .chat-messages::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
@@ -256,17 +243,19 @@ const handleKeydown = (e: KeyboardEvent) => {
 .btn-send-glass:hover {
   background: rgba(56, 189, 248, 0.2);
 }
+
 @media (max-width: 768px) {
   .chat-wrapper {
     font-size: x-small;
-  height: auto; /* Puedes ajustarlo al alto de tu tablero */
-  
- 
-}
+    height: auto;
+    /* Puedes ajustarlo al alto de tu tablero */
+    width: auto;
 
-.chat-input-row input {
- width: 90px;
-}
-}
 
+  }
+
+  .chat-input-row input {
+    width: 90px;
+  }
+}
 </style>

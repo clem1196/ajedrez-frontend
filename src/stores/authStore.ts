@@ -16,12 +16,17 @@ interface UserProfile {
 }
 
 export const useAuthStore = defineStore("auth", {
-  state: () => ({
-    user: null as UserProfile | null,
-    token: localStorage.getItem("chess_token") || null,
-    loading: false,
-    error: null as string | null,
-  }),
+ state: () => {
+    // Intentar leer el usuario guardado previamente
+    const savedUser = localStorage.getItem("chess_user");
+    
+    return {
+      user: savedUser ? (JSON.parse(savedUser) as UserProfile) : null,
+      token: localStorage.getItem("chess_token") || null,
+      loading: false,
+      error: null as string | null,
+    };
+  },
 
   getters: {
     isAuthenticated: (state) => !!state.token && !!state.user,
@@ -56,6 +61,7 @@ export const useAuthStore = defineStore("auth", {
         this.token = token;
         this.user = user;
         localStorage.setItem("chess_token", token);
+        localStorage.setItem("chess_user", JSON.stringify(user));
         console.log(
           `✅ Login exitoso: ${user.nick} (Admin: ${user.isAdmin ? "Sí" : "No"})`,
         );
@@ -112,10 +118,11 @@ export const useAuthStore = defineStore("auth", {
       this.user = null;
       this.token = null;
       localStorage.removeItem("chess_token");
+      localStorage.removeItem("chess_user");
     },
 
     /**
-     * ✅ Actualizar el Elo del usuario (usado después de una partida)
+     * ✅ Actualizar usuario
      */
     async updateProfile(data: {
       nick?: string;
@@ -127,6 +134,7 @@ export const useAuthStore = defineStore("auth", {
       try {
         const response = await api.put("/auth/profile", data);
         this.user = response.data.user;
+        localStorage.setItem("chess_user", JSON.stringify(response.data.user));
         return { success: true, message: response.data.message };
       } catch (err: any) {
         return {
@@ -156,8 +164,10 @@ export const useAuthStore = defineStore("auth", {
       } else if (result === "draw") {
         this.user.draws = (this.user.draws || 0) + 1;
       }
-      
-      console.log(`✅ Elo actualizado localmente: ${this.user.elo} (${result || 'sin resultado'})`);
+
+      console.log(
+        `✅ Elo actualizado localmente: ${this.user.elo} (${result || "sin resultado"})`,
+      );
     },
     /**
      * 🧹 Limpiar errores

@@ -284,6 +284,7 @@ socket.on("draw_offer_canceled", () => {
   const gameStore = useGameStore();
   gameStore.drawOfferedByOpponent = false;
 });
+// ✅ Escuchar fin de partida y actualizar estado + Elo reactivo
 socket.on(
   "game_over",
   (data: {
@@ -294,8 +295,11 @@ socket.on(
     loserMessage?: string;
     whiteEloChange?: number;
     blackEloChange?: number;
+    players?: Array<{ nick: string; newElo: number; eloChange: number }>;
   }) => {
     const gameStore = useGameStore();
+    const authStore = useAuthStore();
+
     gameStore.gameEnded = true;
     gameStore.isReconnecting = false;
     gameStore.isPaused = false;
@@ -345,16 +349,13 @@ socket.on(
         gameStore.endGameMessage = data.message;
       }
     }
-    // ✅ ACTUALIZAR ELO (si viene en los datos)
-    // Solo asignar si no es un aborto
+
+    // ✅ ACTUALIZAR CAMBIO DE ELO EN EL GAMESTORE
     if (data.reason !== "aborted" && data.reason !== "abort_by_inactivity") {
       if (
         data.whiteEloChange !== undefined &&
         data.blackEloChange !== undefined
       ) {
-        const gameStore = useGameStore();
-
-        // ✅ CORREGIDO: Asignar el cambio de Elo según el color del jugador local
         if (gameStore.myColor === "w") {
           gameStore.eloChange = data.whiteEloChange;
           gameStore.opponentEloChange = data.blackEloChange;
@@ -363,7 +364,36 @@ socket.on(
           gameStore.opponentEloChange = data.whiteEloChange;
         }
       }
+
+      // ⚡ ACTUALIZACIÓN REALTIME DEL ELO EN EL AUTHSTORE / PERFIL
+      if (authStore.user && data.players && data.players.length > 0) {
+        const myMatchData = data.players.find(
+          (p) => p.nick === authStore.user?.nick
+        );
+
+        if (myMatchData) {
+          // 1. Actualizar memoria reactiva de Pinia
+          authStore.user.elo = myMatchData.newElo;
+
+          // 2. Persistir en localStorage/sessionStorage si guardas la sesión allí
+          const storedUser = localStorage.getItem("user");
+          if (storedUser) {
+            try {
+              const parsedUser = JSON.parse(storedUser);
+              parsedUser.elo = myMatchData.newElo;
+              localStorage.setItem("user", JSON.stringify(parsedUser));
+            } catch (e) {
+              console.error("Error actualizando localStorage de usuario:", e);
+            }
+          }
+
+          console.log(
+            `📈 [EloSync] Elo actualizado reactivamente en el cliente: ${myMatchData.newElo}`
+          );
+        }
+      }
     }
+
     console.log(`🏁 Partida terminada: ${gameStore.endGameMessage}`);
   },
 );

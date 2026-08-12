@@ -109,9 +109,22 @@ const botStats = ref({ total: 0, active: 0, names: [] as string[] });
 const loading = ref(false);
 const saving = ref(false);
 const showConfirmModal = ref(false); 
-const difficultyLevels = ['easy', 'medium', 'hard'];
 
-// ✅ Funciones
+// 🎯 Actualizado a los 4 niveles calibrados
+const difficultyLevels = ['easy', 'medium', 'hard', 'grandmaster'];
+
+// ✅ Etiquetas legibles para la interfaz
+const getDifficultyLabel = (level: string) => {
+  const labels: Record<string, string> = { 
+    easy: 'Fácil', 
+    medium: 'Medio', 
+    hard: 'Difícil',
+    grandmaster: 'Gran Maestro'
+  };
+  return labels[level] || level;
+};
+
+// ✅ Confirmar y guardar cambios
 const confirmAccept = async () => {
   saving.value = true;
   try {
@@ -123,6 +136,7 @@ const confirmAccept = async () => {
         router.push('/');
       }, 300);
     } else {
+      console.log(success)
       alert('Error al guardar la configuración. Por favor, intenta nuevamente.');
     }
   } catch (error) {
@@ -133,17 +147,10 @@ const confirmAccept = async () => {
   }
 };
 
-const getDifficultyLabel = (level: string) => {
-  const labels: Record<string, string> = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil' };
-  return labels[level] || level;
-};
-
-// ✅ Solo actualiza el estado local. La API se llama al dar "Aceptar".
 const toggleBots = () => {
   botsEnabled.value = !botsEnabled.value;
 };
 
-// ✅ Solo actualiza el estado local. La API se llama al dar "Aceptar".
 const setDifficulty = (level: string) => {
   currentDifficulty.value = level;
 };
@@ -170,7 +177,6 @@ const loadStats = async () => {
     if (response.data.status === 'success') {
       botStats.value = response.data.data;
       
-      // ✅ Sincronizar configuración (maneja tanto camelCase como UPPER_CASE por si acaso)
       const config = response.data.data.config || {};
       botsEnabled.value = config.enabled ?? config.ENABLED ?? true;
       currentDifficulty.value = config.difficulty ?? config.DIFFICULTY ?? 'easy';
@@ -185,17 +191,15 @@ const loadStats = async () => {
 };
 
 const resetConfig = async () => {
-  // 1. Resetear estado local
   botsEnabled.value = true;
   currentDifficulty.value = 'easy';
   botProbability.value = 100;
   minPlayersToDisable.value = 5;
   
-  // 2. Guardar en el servidor
   const success = await updateConfig();
   if (success) {
     console.log('✅ Configuración restaurada a valores por defecto');
-    await loadStats(); // Recargar para confirmar
+    await loadStats();
   } else {
     alert('Error al restaurar la configuración en el servidor.');
   }

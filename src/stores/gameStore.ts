@@ -211,12 +211,12 @@ export const useGameStore = defineStore("game", {
       }
 
       // ✅ Mensaje si es un bot
-      if (this.isBotOpponent) {
+     /* if (this.isBotOpponent) {
         console.log(`🤖 Estás jugando contra un bot: ${this.opponentNick}`);
         this.addSystemMessage(
           `🤖 Has sido emparejado con el bot ${this.opponentNick}`,
         );
-      }
+      }*/
 
       // ✅ Guardar en sessionStorage DESPUÉS de asignar myColor
       const authStore = useAuthStore();

@@ -37,6 +37,12 @@ const router = createRouter({
       component: ()=>import('../views/AdminView.vue'),
       meta: { requiresAuth: true}, 
     },
+  {
+    path: '/profile/edit',
+    name: 'UpdateProfile',
+    component: ()=>import('../views/UpdateProfileView.vue'),
+    meta: { requiresAuth: true } // si tu router maneja guardas de autenticación
+  }
   ],
 });
 router.beforeEach((to, from) => {

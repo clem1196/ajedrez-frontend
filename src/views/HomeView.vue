@@ -14,7 +14,7 @@
           v-if="!authStore.isAuthenticated"
           v-model="nickInput" 
           type="text" 
-          placeholder="Tu Nick (Ej: Terminator77)" 
+          placeholder="Tu Nick (Ej: Depredador10)" 
           class="input-nick"
           maxLength="15"
           @keyup.enter="handlePlay"
@@ -25,6 +25,9 @@
           <div class="user-meta">
             <span class="user-nick">{{ authStore.currentNick }}</span>
             <span class="user-elo">Elo Competitivo: <strong>{{ authStore.currentElo }}</strong></span>
+          </div>
+          <div>
+            <button class="btn-time-option"  @click="router.push('/profile/edit')">✏️</button>
           </div>
         </div>
 
@@ -231,12 +234,13 @@ watch(
 .home-container {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: start;
   height: 100vh;
   background-color: #121214;
   color: #fff;
   font-family: sans-serif;
   padding: 20px;
+  width: 500px;
 }
 
 .card-welcome {
@@ -393,13 +397,14 @@ h1 {
 /* Badge de usuario autenticado */
 .auth-user-badge {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 15px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 15px;
   border-radius: 12px;
   text-align: left;
+  justify-content: space-between;
 }
 
 .user-avatar-big {
