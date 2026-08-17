@@ -2,7 +2,7 @@
 <template>
   <div class="home-container">
     <div class="card-welcome">
-      <h1>¡Ajedrez Yá! ♟️</h1>
+      <h1>¡Ajedrez CDB! ♟️</h1>
       
       <p class="subtitle">
         {{ authStore.isAuthenticated ? `Bienvenido de vuelta, ${authStore.currentNick}.` : 'Sin registros, sin rodeos. Ingresa tu nick y juega ya.' }}

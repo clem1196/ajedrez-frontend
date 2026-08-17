@@ -3,7 +3,7 @@
   <nav class="navbar-glass">
     <div class="nav-brand" @click="router.push('/')">
       <span class="brand-logo">♟️</span>
-      <span class="brand-name">Ajedrez Yá</span>
+      <span class="brand-name">Ajedrez CDB</span>
     </div>
 
     <div class="nav-actions">
