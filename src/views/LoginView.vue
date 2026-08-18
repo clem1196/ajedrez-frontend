@@ -233,7 +233,7 @@ const handleSubmit = async () => {
 const loginWith = (provider: string) => {
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   // Redirige correctamente a /api/auth/google, /api/auth/facebook, etc.[cite: 1]
-  window.location.href = `${backendUrl}/api/auth/${provider}`;
+  window.location.href = `${backendUrl}/auth/${provider}`;
 };
 </script>
 
