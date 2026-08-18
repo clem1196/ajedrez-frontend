@@ -1,6 +1,6 @@
 <template>
-  <div class="loading-container">
-    <p>Iniciando sesión con red social...</p>
+  <div class="auth-loading">
+    <p>Autenticando y cargando perfil...</p>
   </div>
 </template>
 
@@ -15,12 +15,16 @@ const authStore = useAuthStore();
 
 onMounted(async () => {
   const token = route.query.token as string;
+  
   if (token) {
-    // Guarda el token en tu Pinia store / localStorage
-    await authStore.setTokenAndFetchUser(token);
-    router.push({ name: 'home' });
+    const result = await authStore.setTokenAndFetchUser(token);
+    if (result.success) {
+      router.push({ name: 'home' });
+    } else {
+      router.push({ name: 'login', query: { error: 'profile_failed' } });
+    }
   } else {
-    router.push({ name: 'login', query: { error: 'social_login_failed' } });
+    router.push({ name: 'login', query: { error: 'token_missing' } });
   }
 });
 </script>
