@@ -231,9 +231,9 @@ const handleSubmit = async () => {
 
 // ✅ NUEVO: Función para login social
 const loginWith = (provider: string) => {
-  // Redirigir al backend para iniciar el flujo OAuth
-  // La URL debe coincidir con la ruta definida en authRoutes.ts
-  window.location.href = `/api/auth/auth/${provider}`;
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  // Redirige correctamente a /api/auth/google, /api/auth/facebook, etc.[cite: 1]
+  window.location.href = `${backendUrl}/api/auth/${provider}`;
 };
 </script>
 

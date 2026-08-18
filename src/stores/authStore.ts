@@ -16,10 +16,10 @@ interface UserProfile {
 }
 
 export const useAuthStore = defineStore("auth", {
- state: () => {
+  state: () => {
     // Intentar leer el usuario guardado previamente
     const savedUser = localStorage.getItem("chess_user");
-    
+
     return {
       user: savedUser ? (JSON.parse(savedUser) as UserProfile) : null,
       token: localStorage.getItem("chess_token") || null,
@@ -48,6 +48,24 @@ export const useAuthStore = defineStore("auth", {
   },
 
   actions: {
+    async setTokenAndFetchUser(token: string) {
+      this.token = token;
+      localStorage.setItem("chess_token", token);
+
+      // Obtener los datos del perfil utilizando el token recién guardado
+      const profileResult = await this.fetchProfile();
+
+      if (profileResult?.success && this.user) {
+        localStorage.setItem("chess_user", JSON.stringify(this.user));
+        return { success: true };
+      } else {
+        this.logout();
+        return {
+          success: false,
+          message: "Error al obtener perfil del usuario",
+        };
+      }
+    },
     /**
      * 🔐 Iniciar sesión y guardar el token JWT
      */
