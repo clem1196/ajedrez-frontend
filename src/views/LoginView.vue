@@ -85,6 +85,15 @@
           </span>
           Google
         </button>
+          <button @click="loginWith('github')" class="social-btn github-btn" type="button">
+          <span class="social-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#1877F2"
+                d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+          </span>
+          Facebook
+        </button>
 
         <button @click="loginWith('facebook')" class="social-btn facebook-btn" type="button">
           <span class="social-icon">
@@ -231,7 +240,7 @@ const handleSubmit = async () => {
 
 // ✅ NUEVO: Función para login social
 const loginWith = (provider: string) => {
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
   // Redirige correctamente a /api/auth/google, /api/auth/facebook, etc.[cite: 1]
   window.location.href = `${backendUrl}/auth/${provider}`;
 };
@@ -610,7 +619,10 @@ const loginWith = (provider: string) => {
   border-color: #EA4335;
   box-shadow: 0 0 20px rgba(234, 67, 53, 0.15);
 }
-
+.github-btn:hover {
+  border-color: #4d535c;
+  box-shadow: 0 0 20px rgba(24, 119, 242, 0.15);
+}
 .facebook-btn:hover {
   border-color: #1877F2;
   box-shadow: 0 0 20px rgba(24, 119, 242, 0.15);
