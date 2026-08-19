@@ -97,6 +97,16 @@
           </span>
           GitHub
         </button>
+        <button @click="loginWith('lichess')" class="social-btn lichess-btn" type="button">
+          <span class="social-icon">
+            <!-- Ícono del caballo de Lichess -->
+            <svg viewBox="0 0 50 50" width="20" height="20">
+              <path fill="#FFFFFF"
+                d="M 25 3 C 12.85 3 3 12.85 3 25 C 3 37.15 12.85 47 25 47 C 37.15 47 47 37.15 47 25 C 47 12.85 37.15 3 25 3 z M 27.2 9.5 C 29.5 9.5 31.8 11.2 31.8 13.8 C 31.8 15.2 31.1 16.5 30.2 17.5 C 33.1 18.2 35.3 20.8 35.3 24 C 35.3 28 32 31.2 28 31.2 L 22.8 31.2 L 22.8 38 L 18 38 L 18 20.2 C 18 14.3 22.1 9.5 27.2 9.5 z" />
+            </svg>
+          </span>
+          Lichess
+        </button>
       </div>
 
       <div class="auth-footer">
@@ -608,6 +618,15 @@ const loginWith = (provider: string) => {
 
 .github-btn:hover {
   background-color: #1b1f23;
+}
+.lichess-btn {
+  background-color: #050505;
+  color: #ffffff;
+  border: 1px solid #333;
+}
+
+.lichess-btn:hover {
+  background-color: #1a1a1a;
 }
 
 /* Responsive */
