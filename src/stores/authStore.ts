@@ -2,6 +2,7 @@
 import { defineStore } from "pinia";
 import api from "../services/api";
 
+// ✅ 1. Agregamos los IDs de las redes sociales a la interfaz del usuario
 interface UserProfile {
   id: number;
   nick: string;
@@ -13,6 +14,9 @@ interface UserProfile {
   totalGames?: number;
   winRate?: number;
   isAdmin?: boolean;
+  googleId?: string | null;
+  githubId?: string | null;
+  lichessId?: string | null;
 }
 
 export const useAuthStore = defineStore("auth", {
@@ -32,7 +36,6 @@ export const useAuthStore = defineStore("auth", {
     isAuthenticated: (state) => !!state.token && !!state.user,
     currentNick: (state) => state.user?.nick || "Invitado",
     currentElo: (state) => state.user?.elo || 1200,
-    // ✅ Getter para obtener el ID del usuario
     currentUserId: (state) => state.user?.id || null,
     isAdmin: (state) => state.user?.isAdmin || false,
     userStats: (state) =>
@@ -66,6 +69,7 @@ export const useAuthStore = defineStore("auth", {
         };
       }
     },
+
     /**
      * 🔐 Iniciar sesión y guardar el token JWT
      */
@@ -81,7 +85,7 @@ export const useAuthStore = defineStore("auth", {
         localStorage.setItem("chess_token", token);
         localStorage.setItem("chess_user", JSON.stringify(user));
         console.log(
-          `✅ Login exitoso: ${user.nick} (Admin: ${user.isAdmin ? "Sí" : "No"})`,
+          `✅ Login exitoso: ${user.nick} (Admin: ${user.isAdmin ? "Sí" : "No"})`
         );
 
         return { success: true };
@@ -94,18 +98,22 @@ export const useAuthStore = defineStore("auth", {
         this.loading = false;
       }
     },
+
     async fetchProfile() {
       if (!this.token) return;
 
       try {
         const response = await api.get("/auth/me");
         this.user = response.data.user;
+        // Mantenemos sincronizado el localStorage
+        localStorage.setItem("chess_user", JSON.stringify(response.data.user));
         return { success: true };
       } catch (err) {
         this.logout();
         return { success: false };
       }
     },
+
     /**
      * 📝 Registrar una nueva cuenta
      */
@@ -165,16 +173,13 @@ export const useAuthStore = defineStore("auth", {
     },
 
     /**
-     * ✅ NUEVO: Actualizar todo el resultado de la partida de una sola vez
-     * (Elo + Victorias/Derrotas/Empates)
+     * ✅ Actualizar el resultado de la partida
      */
     updateLocalElo(newElo: number, result?: "win" | "loss" | "draw") {
       if (!this.user) return;
 
-      // 1. Actualizar Elo
       this.user.elo = newElo;
 
-      // 2. Actualizar estadísticas de partidas (Victorias/Derrotas/Empates)
       if (result === "win") {
         this.user.wins = (this.user.wins || 0) + 1;
       } else if (result === "loss") {
@@ -184,12 +189,10 @@ export const useAuthStore = defineStore("auth", {
       }
 
       console.log(
-        `✅ Elo actualizado localmente: ${this.user.elo} (${result || "sin resultado"})`,
+        `✅ Elo actualizado localmente: ${this.user.elo} (${result || "sin resultado"})`
       );
     },
-    /**
-     * 🧹 Limpiar errores
-     */
+
     clearError() {
       this.error = null;
     },

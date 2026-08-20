@@ -4,7 +4,6 @@
       <h2 class="title">✏️ Editar Perfil</h2>
       <p class="subtitle">Gestiona tu información personal y seguridad.</p>
 
-      <!-- Alertas de Estado -->
       <div v-if="errorMessage" class="alert alert-danger">
         ⚠️ {{ errorMessage }}
       </div>
@@ -13,7 +12,6 @@
       </div>
 
       <form @submit.prevent="handleSubmit" class="profile-form">
-        <!-- Campo: Nick -->
         <div class="form-group">
           <label for="nick">Nombre de Usuario (Nick)</label>
           <input
@@ -27,7 +25,6 @@
           />
         </div>
 
-        <!-- Campo: Email -->
         <div class="form-group">
           <label for="email">Correo Electrónico</label>
           <input
@@ -44,7 +41,6 @@
         <hr class="divider" />
         <p class="section-subtitle">🔒 Cambiar Contraseña (Opcional)</p>
 
-        <!-- Campo: Contraseña Actual -->
         <div class="form-group">
           <label for="currentPassword">Contraseña Actual</label>
           <input
@@ -57,7 +53,6 @@
           />
         </div>
 
-        <!-- Campo: Nueva Contraseña -->
         <div class="form-group">
           <label for="newPassword">Nueva Contraseña</label>
           <input
@@ -70,7 +65,6 @@
           />
         </div>
 
-        <!-- Botones de Acción -->
         <div class="form-actions">
           <button 
             type="button" 
@@ -91,19 +85,62 @@
           </button>
         </div>
       </form>
+
+      <hr class="divider" />
+      <p class="section-subtitle">🔗 Cuentas Vinculadas</p>
+      <div class="social-links-container">
+        
+        <div class="social-item">
+          <span>🌐 Google</span>
+          <button 
+            v-if="!authStore.user?.googleId" 
+            @click="linkProvider('google')" 
+            class="btn-link"
+          >
+            Vincular
+          </button>
+          <span v-else class="status-connected">✓ Vinculado</span>
+        </div>
+
+        <div class="social-item">
+          <span>🐙 GitHub</span>
+          <button 
+            v-if="!authStore.user?.githubId" 
+            @click="linkProvider('github')" 
+            class="btn-link"
+          >
+            Vincular
+          </button>
+          <span v-else class="status-connected">✓ Vinculado</span>
+        </div>
+
+        <div class="social-item">
+          <span>♟️ Lichess</span>
+          <button 
+            v-if="!authStore.user?.lichessId" 
+            @click="linkProvider('lichess')" 
+            class="btn-link"
+          >
+            Vincular
+          </button>
+          <span v-else class="status-connected">✓ Vinculado</span>
+        </div>
+
+      </div>
+
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/authStore'; // Asegúrate de ajustar la ruta a tu store
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/authStore';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
-// Estado local del formulario
 const form = ref({
   nick: '',
   email: '',
@@ -111,7 +148,6 @@ const form = ref({
   newPassword: ''
 });
 
-// Respaldo para comparar cambios
 const originalData = ref({
   nick: '',
   email: ''
@@ -120,7 +156,6 @@ const originalData = ref({
 const errorMessage = ref('');
 const successMessage = ref('');
 
-// Cargar los datos actuales desde el store al cargar la vista
 onMounted(() => {
   if (authStore.user) {
     form.value.nick = authStore.user.nick || '';
@@ -131,9 +166,27 @@ onMounted(() => {
       email: form.value.email
     };
   }
+
+  // Detectar si venimos de vincular una cuenta con éxito
+  if (route.query.linked) {
+    successMessage.value = `¡Cuenta de ${route.query.linked} vinculada exitosamente!`;
+    // Limpiar query params de la URL
+    router.replace({ query: {} });
+  } else if (route.query.error) {
+    errorMessage.value = 'Hubo un error al intentar vincular la cuenta.';
+    router.replace({ query: {} });
+  }
 });
 
-// Comprobar si hay modificaciones pendientes
+// Función para iniciar la vinculación con el backend
+const linkProvider = (provider: string) => {
+  const token = authStore.token || localStorage.getItem('token');
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://ajedrez-backend-scym.onrender.com';
+  
+  // Redirigimos al endpoint del backend enviando el JWT
+  window.location.href = `${backendUrl}/api/auth/link/${provider}?token=${token}`;
+};
+
 const hasChanges = computed(() => {
   const isProfileChanged = form.value.nick !== originalData.value.nick || 
                            form.value.email !== originalData.value.email;
@@ -142,18 +195,15 @@ const hasChanges = computed(() => {
   return isProfileChanged || isPasswordProvided;
 });
 
-// Enviar formulario utilizando el método del store
 const handleSubmit = async () => {
   errorMessage.value = '';
   successMessage.value = '';
 
-  // Validación básica previa de contraseñas
   if (form.value.newPassword && !form.value.currentPassword) {
     errorMessage.value = 'Debes ingresar tu contraseña actual para establecer una nueva.';
     return;
   }
 
-  // Construir payload limpio (solo enviar lo necesario)
   const payload: {
     nick?: string;
     email?: string;
@@ -168,17 +218,13 @@ const handleSubmit = async () => {
     payload.newPassword = form.value.newPassword;
   }
 
-  // Llamada al authStore
   const result = await authStore.updateProfile(payload);
 
   if (result.success) {
     successMessage.value = result.message || 'Perfil actualizado correctamente.';
-    
-    // Limpiar campos sensibles
     form.value.currentPassword = '';
     form.value.newPassword = '';
 
-    // Actualizar copia original con la nueva información
     if (authStore.user) {
       originalData.value = {
         nick: authStore.user.nick,
@@ -200,6 +246,8 @@ const cancelEdit = () => {
 </script>
 
 <style scoped>
+/* (Estilos existentes intactos...) */
+
 .update-profile-container {
   display: flex;
   justify-content: center;
@@ -348,5 +396,45 @@ const cancelEdit = () => {
 
 .btn-secondary:hover:not(:disabled) {
   background-color: #475569;
+}
+
+/* 🎨 NUEVOS ESTILOS PARA LA SECCIÓN DE REDES SOCIALES */
+.social-links-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.social-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #0f172a;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.btn-link {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-link:hover {
+  background-color: #1d4ed8;
+}
+
+.status-connected {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 </style>
