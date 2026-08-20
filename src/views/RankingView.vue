@@ -30,7 +30,7 @@
                         <tr>
                             <th class="text-center">Puesto</th>
                             <th>Jugador</th>
-                            <th class="text-right">Puntaje Elo</th>
+                            <th class="text-right">Elo</th>
                             <th class="text-right">Partidas</th>
                             <th class="text-right">Victorias</th>
                             <th class="text-right">% Victorias</th>

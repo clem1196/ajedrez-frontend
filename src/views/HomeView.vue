@@ -21,7 +21,7 @@
         />
 
         <div v-else class="auth-user-badge">
-          <span class="user-avatar-big">🏆</span>
+          <span class="user-avatar-big">👤</span>
           <div class="user-meta">
             <span class="user-nick">{{ authStore.currentNick }}</span>
             <span class="user-elo">Elo Competitivo: <strong>{{ authStore.currentElo }}</strong></span>
