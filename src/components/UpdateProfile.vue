@@ -270,9 +270,11 @@ const cancelEdit = () => {
   display: flex;
   justify-content: center;
   align-items: flex-start; /* Cambiado para permitir scroll */
+  width: 100%;
+   height: 100%;
   min-height: 100vh;
-  padding: 2rem 1.5rem;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 0;
+ background: transparent;
   box-sizing: border-box;
 }
 
@@ -290,7 +292,7 @@ const cancelEdit = () => {
   transition: all 0.3s ease;
 
   /* 🔥 NUEVO: scroll interno cuando el contenido crece */
-  max-height: 90vh;
+  max-height: 85vh;
   overflow-y: auto;
 
   /* Personalización del scroll (opcional) */
