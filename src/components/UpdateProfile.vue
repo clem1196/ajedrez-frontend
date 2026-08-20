@@ -6,7 +6,6 @@
         <p class="subtitle">Gestiona tu información personal y seguridad.</p>
       </div>
 
-      <!-- Alertas animadas -->
       <transition-group name="fade" tag="div">
         <div v-if="errorMessage" key="error" class="alert alert-danger">
           <span class="alert-icon">⚠️</span> {{ errorMessage }}
@@ -17,7 +16,6 @@
       </transition-group>
 
       <form @submit.prevent="handleSubmit" class="profile-form">
-        <!-- Campos básicos -->
         <div class="form-group">
           <label for="nick">
             <span class="label-icon">👤</span> Nombre de Usuario
@@ -50,7 +48,6 @@
 
         <hr class="divider" />
 
-        <!-- Cambio de contraseña -->
         <div class="section-subtitle">
           <span class="lock-icon">🔒</span> Cambiar Contraseña <span class="optional">(Opcional)</span>
         </div>
@@ -79,7 +76,6 @@
           />
         </div>
 
-        <!-- Botones -->
         <div class="form-actions">
           <button
             type="button"
@@ -102,7 +98,6 @@
 
       <hr class="divider" />
 
-      <!-- Cuentas vinculadas -->
       <div class="social-section">
         <div class="section-subtitle">
           <span class="link-icon">🔗</span> Cuentas Vinculadas
@@ -185,7 +180,6 @@ onMounted(() => {
   if (authStore.user) {
     form.value.nick = authStore.user.nick || '';
     form.value.email = authStore.user.email || '';
-    
     originalData.value = {
       nick: form.value.nick,
       email: form.value.email
@@ -265,20 +259,17 @@ const cancelEdit = () => {
 </script>
 
 <style scoped>
-/* ===== CONTENEDOR PRINCIPAL ===== */
 .update-profile-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Cambiado para permitir scroll */
+  align-items: flex-start;
   width: 100%;
-   height: 100%;
-  min-height: 100vh;
+  height: 100%;
   padding: 0;
- background: transparent;
+  background: transparent;
   box-sizing: border-box;
 }
 
-/* ===== TARJETA ===== */
 .profile-card {
   background: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(12px);
@@ -290,12 +281,8 @@ const cancelEdit = () => {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   color: #f1f5f9;
   transition: all 0.3s ease;
-
-  /* 🔥 NUEVO: scroll interno cuando el contenido crece */
   max-height: 85vh;
   overflow-y: auto;
-
-  /* Personalización del scroll (opcional) */
   scrollbar-width: thin;
   scrollbar-color: #475569 transparent;
 }
@@ -311,7 +298,6 @@ const cancelEdit = () => {
   border-radius: 10px;
 }
 
-/* ===== ENCABEZADO ===== */
 .card-header {
   margin-bottom: 1.5rem;
   text-align: center;
@@ -333,7 +319,6 @@ const cancelEdit = () => {
   margin-top: 0.25rem;
 }
 
-/* ===== ALERTAS ===== */
 .alert {
   padding: 0.8rem 1rem;
   border-radius: 10px;
@@ -362,7 +347,6 @@ const cancelEdit = () => {
   font-size: 1.2rem;
 }
 
-/* ===== FORMULARIO ===== */
 .profile-form {
   display: flex;
   flex-direction: column;
@@ -413,7 +397,6 @@ const cancelEdit = () => {
   cursor: not-allowed;
 }
 
-/* ===== DIVISORES Y TÍTULOS SECCIÓN ===== */
 .divider {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -441,7 +424,6 @@ const cancelEdit = () => {
   font-size: 1.1rem;
 }
 
-/* ===== BOTONES ===== */
 .form-actions {
   display: flex;
   gap: 1rem;
@@ -493,7 +475,6 @@ const cancelEdit = () => {
   background: rgba(71, 85, 105, 0.8);
 }
 
-/* ===== SECCIÓN SOCIAL ===== */
 .social-section {
   margin-top: 0.5rem;
 }
@@ -556,7 +537,6 @@ const cancelEdit = () => {
   font-size: 1.1rem;
 }
 
-/* ===== ANIMACIONES ===== */
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -578,13 +558,7 @@ const cancelEdit = () => {
   transform: translateY(-8px);
 }
 
-/* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
-  .update-profile-container {
-    padding: 1rem;
-    align-items: flex-start;
-  }
-
   .profile-card {
     padding: 1.5rem;
     border-radius: 16px;
