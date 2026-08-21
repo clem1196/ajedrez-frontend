@@ -85,7 +85,7 @@ export const useAuthStore = defineStore("auth", {
         localStorage.setItem("chess_token", token);
         localStorage.setItem("chess_user", JSON.stringify(user));
         console.log(
-          `✅ Login exitoso: ${user.nick} (Admin: ${user.isAdmin ? "Sí" : "No"})`
+          `✅ Login exitoso: ${user.nick} (Admin: ${user.isAdmin ? "Sí" : "No"})`,
         );
 
         return { success: true };
@@ -96,6 +96,33 @@ export const useAuthStore = defineStore("auth", {
         return { success: false, message };
       } finally {
         this.loading = false;
+      }
+    },
+    async forgotPassword(email: string) {
+      this.loading = true;
+      try {
+        const backendUrl =
+          import.meta.env.VITE_API_URL || "http://localhost:4000";
+        const response = await fetch(`${backendUrl}/auth/forgot-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+        this.loading = false;
+
+        if (!response.ok) {
+          return { success: false, message: data.message };
+        }
+
+        return { success: true, message: data.message };
+      } catch (error) {
+        this.loading = false;
+        return {
+          success: false,
+          message: "Error de conexión con el servidor.",
+        };
       }
     },
 
@@ -189,7 +216,7 @@ export const useAuthStore = defineStore("auth", {
       }
 
       console.log(
-        `✅ Elo actualizado localmente: ${this.user.elo} (${result || "sin resultado"})`
+        `✅ Elo actualizado localmente: ${this.user.elo} (${result || "sin resultado"})`,
       );
     },
 

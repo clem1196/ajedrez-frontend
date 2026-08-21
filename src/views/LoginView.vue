@@ -1,4 +1,3 @@
-<!-- src/views/LoginView.vue -->
 <template>
   <div class="auth-container">
     <div class="auth-card glass-card">
@@ -25,98 +24,122 @@
         ✅ {{ successMessage }}
       </div>
 
-      <!-- ✅ FORMULARIO TRADICIONAL (sin cambios) -->
-      <form @submit.prevent="handleSubmit" class="auth-form" novalidate>
-        <div v-if="!isLogin" class="form-group">
-          <label for="nick">Nick (Nombre de usuario)</label>
-          <div class="nick-wrapper">
-            <input v-model="formData.nick" type="text" id="nick" placeholder="Ej: Capablanca_99" required minlength="3"
-              maxlength="15" pattern="[A-Za-z0-9_]+" title="Solo letras, números y guión bajo"
-              autocomplete="username" />
+      <!-- 🟢 VISTA 1: FORMULARIO PRINCIPAL (LOGIN / REGISTRO) -->
+      <template v-if="!showForgotPassword">
+        <form @submit.prevent="handleSubmit" class="auth-form" novalidate>
+          <div v-if="!isLogin" class="form-group">
+            <label for="nick">Nick (Nombre de usuario)</label>
+            <div class="nick-wrapper">
+              <input v-model="formData.nick" type="text" id="nick" placeholder="Ej: Capablanca_99" required minlength="3"
+                maxlength="15" pattern="[A-Za-z0-9_]+" title="Solo letras, números y guión bajo"
+                autocomplete="username" />
+            </div>
+            <small class="input-hint">3-15 caracteres, solo letras, números y _</small>
           </div>
-          <small class="input-hint">3-15 caracteres, solo letras, números y _</small>
-        </div>
 
-        <div class="form-group">
-          <label for="email">Correo Electrónico</label>
-          <div class="email-wrapper">
-            <input v-model="formData.email" type="email" id="email" placeholder="tu_correo@gmail.com" required
-              autocomplete="email" />
+          <div class="form-group">
+            <label for="email">Correo Electrónico</label>
+            <div class="email-wrapper">
+              <input v-model="formData.email" type="email" id="email" placeholder="tu_correo@gmail.com" required
+                autocomplete="email" />
+            </div>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label for="password">Contraseña</label>
-          <div class="password-wrapper">
-            <input v-model="formData.password" :type="showPassword ? 'text' : 'password'" id="password"
-              placeholder="••••••••" required minlength="6" autocomplete="current-password" />
-            <button type="button" class="toggle-password" @click="showPassword = !showPassword" tabindex="-1">
-              {{ showPassword ? '🙈' : '👁️' }}
-            </button>
+          <div class="form-group">
+            <div class="label-with-link">
+              <label for="password">Contraseña</label>
+              <!-- 🔗 Botón '¿Olvidaste tu contraseña?' -->
+              <button v-if="isLogin" type="button" class="forgot-btn" @click="toggleForgotPassword(true)">
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+            <div class="password-wrapper">
+              <input v-model="formData.password" :type="showPassword ? 'text' : 'password'" id="password"
+                placeholder="••••••••" required minlength="6" autocomplete="current-password" />
+              <button type="button" class="toggle-password" @click="showPassword = !showPassword" tabindex="-1">
+                {{ showPassword ? '🙈' : '👁️' }}
+              </button>
+            </div>
+            <small v-if="!isLogin" class="input-hint">Mínimo 6 caracteres</small>
           </div>
-          <small v-if="!isLogin" class="input-hint">Mínimo 6 caracteres</small>
-        </div>
 
-        <button type="submit" class="btn-glass submit-btn" :disabled="authStore.loading || !isFormValid">
-          {{ authStore.loading ? 'Procesando...' : (isLogin ? '🚀 Entrar a la Arena' : '✨ Crear Cuenta') }}
-        </button>
-      </form>
-
-      <!-- ✅ NUEVO: SEPARADOR Y BOTONES SOCIALES -->
-      <div class="social-divider">
-        <span class="divider-line"></span>
-        <span class="divider-text">o continúa con</span>
-        <span class="divider-line"></span>
-      </div>
-
-      <div class="social-buttons">
-        <!-- Google -->
-        <button @click="loginWith('google')" class="social-btn google-btn" type="button">
-          <span class="social-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path fill="#EA4335"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-              <path fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
-              <path fill="#4285F4"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-          </span>
-          Google
-        </button>
-
-        <!-- GitHub -->
-        <button @click="loginWith('github')" class="social-btn github-btn" type="button">
-          <span class="social-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20">
-              <path fill="#FFFFFF" fill-rule="evenodd" clip-rule="evenodd"
-                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-            </svg>
-          </span>
-          GitHub
-        </button>
-        <button @click="loginWith('lichess')" class="social-btn lichess-btn" type="button">
-          <span class="social-icon">
-            <!-- Ícono del caballo de Lichess -->
-            <svg viewBox="0 0 50 50" width="20" height="20">
-              <path fill="#FFFFFF"
-                d="M 25 3 C 12.85 3 3 12.85 3 25 C 3 37.15 12.85 47 25 47 C 37.15 47 47 37.15 47 25 C 47 12.85 37.15 3 25 3 z M 27.2 9.5 C 29.5 9.5 31.8 11.2 31.8 13.8 C 31.8 15.2 31.1 16.5 30.2 17.5 C 33.1 18.2 35.3 20.8 35.3 24 C 35.3 28 32 31.2 28 31.2 L 22.8 31.2 L 22.8 38 L 18 38 L 18 20.2 C 18 14.3 22.1 9.5 27.2 9.5 z" />
-            </svg>
-          </span>
-          Lichess
-        </button>
-      </div>
-
-      <div class="auth-footer">
-        <p>
-          {{ isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?' }}
-          <button type="button" class="link-btn" @click="switchTab(!isLogin)">
-            {{ isLogin ? 'Regístrate' : 'Inicia Sesión' }}
+          <button type="submit" class="btn-glass submit-btn" :disabled="authStore.loading || !isFormValid">
+            {{ authStore.loading ? 'Procesando...' : (isLogin ? '🚀 Entrar a la Arena' : '✨ Crear Cuenta') }}
           </button>
-        </p>
-      </div>
+        </form>
+
+        <!-- SEPARADOR Y BOTONES SOCIALES -->
+        <div class="social-divider">
+          <span class="divider-line"></span>
+          <span class="divider-text">o continúa con</span>
+          <span class="divider-line"></span>
+        </div>
+
+        <div class="social-buttons">
+          <button @click="loginWith('google')" class="social-btn google-btn" type="button">
+            <span class="social-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="#EA4335" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                <path fill="#4285F4" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+            </span>
+            Google
+          </button>
+
+          <button @click="loginWith('github')" class="social-btn github-btn" type="button">
+            <span class="social-icon">
+              <svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="#FFFFFF" fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+              </svg>
+            </span>
+            GitHub
+          </button>
+
+          <button @click="loginWith('lichess')" class="social-btn lichess-btn" type="button">
+            <span class="social-icon">
+              <svg viewBox="0 0 50 50" width="20" height="20">
+                <path fill="#FFFFFF" d="M 25 3 C 12.85 3 3 12.85 3 25 C 3 37.15 12.85 47 25 47 C 37.15 47 47 37.15 47 25 C 47 12.85 37.15 3 25 3 z M 27.2 9.5 C 29.5 9.5 31.8 11.2 31.8 13.8 C 31.8 15.2 31.1 16.5 30.2 17.5 C 33.1 18.2 35.3 20.8 35.3 24 C 35.3 28 32 31.2 28 31.2 L 22.8 31.2 L 22.8 38 L 18 38 L 18 20.2 C 18 14.3 22.1 9.5 27.2 9.5 z" />
+              </svg>
+            </span>
+            Lichess
+          </button>
+        </div>
+
+        <div class="auth-footer">
+          <p>
+            {{ isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?' }}
+            <button type="button" class="link-btn" @click="switchTab(!isLogin)">
+              {{ isLogin ? 'Regístrate' : 'Inicia Sesión' }}
+            </button>
+          </p>
+        </div>
+      </template>
+
+      <!-- 🔴 VISTA 2: FORMULARIO RECUPERAR CONTRASEÑA -->
+      <template v-else>
+        <form @submit.prevent="handleForgotPassword" class="auth-form">
+          <p class="reset-instruction">
+            Ingresa tu correo electrónico asociado a tu cuenta local para recibir las instrucciones de recuperación.
+          </p>
+          <div class="form-group">
+            <label for="reset-email">Correo Electrónico</label>
+            <div class="email-wrapper">
+              <input v-model="resetEmail" type="email" id="reset-email" placeholder="tu_correo@gmail.com" required autocomplete="email" />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-glass submit-btn" :disabled="authStore.loading || !resetEmail.trim()">
+            {{ authStore.loading ? 'Enviando...' : '📧 Enviar Enlace de Recuperación' }}
+          </button>
+
+          <button type="button" class="link-btn back-btn" @click="toggleForgotPassword(false)">
+            ← Volver a Iniciar Sesión
+          </button>
+        </form>
+      </template>
+
     </div>
   </div>
 </template>
@@ -131,6 +154,8 @@ const router = useRouter();
 
 const isLogin = ref(true);
 const showPassword = ref(false);
+const showForgotPassword = ref(false);
+const resetEmail = ref('');
 const errorMessage = ref('');
 const successMessage = ref('');
 
@@ -140,7 +165,7 @@ const formData = reactive({
   password: '',
 });
 
-// ✅ Validación del formulario (sin cambios)
+// Validación del formulario
 const isFormValid = computed(() => {
   if (isLogin.value) {
     return formData.email.trim() !== '' && formData.password.length >= 6;
@@ -154,10 +179,11 @@ const isFormValid = computed(() => {
   );
 });
 
-// ✅ Limpiar alertas y formulario al cambiar de pestaña (sin cambios)
+// Cambiar entre Pestañas Login / Registro
 const switchTab = (tab: boolean) => {
   if (isLogin.value !== tab) {
     isLogin.value = tab;
+    showForgotPassword.value = false;
     errorMessage.value = '';
     successMessage.value = '';
     formData.nick = '';
@@ -167,22 +193,20 @@ const switchTab = (tab: boolean) => {
   }
 };
 
-// ✅ Watch para limpiar mensajes (sin cambios)
-watch(
-  () => formData.email,
-  () => {
-    if (errorMessage.value) errorMessage.value = '';
+// Alternar vista de Olvidé mi Contraseña
+const toggleForgotPassword = (value: boolean) => {
+  showForgotPassword.value = value;
+  errorMessage.value = '';
+  successMessage.value = '';
+  if (value) {
+    resetEmail.value = formData.email; // Pre-llenar si ya había escrito su correo
   }
-);
+};
 
-watch(
-  () => formData.password,
-  () => {
-    if (errorMessage.value) errorMessage.value = '';
-  }
-);
+watch(() => formData.email, () => { if (errorMessage.value) errorMessage.value = ''; });
+watch(() => formData.password, () => { if (errorMessage.value) errorMessage.value = ''; });
 
-// ✅ Login tradicional (sin cambios)
+// Submit Login/Register
 const handleSubmit = async () => {
   if (!isFormValid.value) {
     errorMessage.value = 'Por favor, completa todos los campos correctamente.';
@@ -229,10 +253,29 @@ const handleSubmit = async () => {
   }
 };
 
-// ✅ NUEVO: Función para login social
+// 📧 Solicitud de Recuperación de Contraseña
+const handleForgotPassword = async () => {
+  if (!resetEmail.value.trim()) return;
+
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  try {
+    // Método que debes agregar en tu authStore
+    const res = await authStore.forgotPassword(resetEmail.value.trim());
+
+    if (res.success) {
+      successMessage.value = res.message || '📧 Correo enviado. Revisa tu bandeja de entrada o spam.';
+    } else {
+      errorMessage.value = res.message || '❌ No se pudo procesar la solicitud.';
+    }
+  } catch (error) {
+    errorMessage.value = '❌ Error de comunicación con el servidor.';
+  }
+};
+
 const loginWith = (provider: string) => {
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-  // Redirige correctamente a /api/auth/google, /api/auth/facebook, etc.[cite: 1]
   window.location.href = `${backendUrl}/auth/${provider}`;
 };
 </script>
@@ -653,5 +696,39 @@ const loginWith = (provider: string) => {
     font-size: 0.85rem;
     padding: 10px 14px;
   }
+}
+/* 🎨 Estilos adicionales para los enlaces de recuperación */
+.label-with-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.forgot-btn {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.forgot-btn:hover {
+  color: #c4b5fd;
+}
+
+.reset-instruction {
+  font-size: 0.85rem;
+  color: #d1d5db;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.back-btn {
+  display: block;
+  margin: 1rem auto 0;
+  font-size: 0.85rem;
 }
 </style>
