@@ -1,3 +1,4 @@
+<!--src/components/UpdateProfile.vue-->
 <template>
   <div class="update-profile-container">
     <div class="profile-card">
@@ -98,48 +99,55 @@
 
       <hr class="divider" />
 
+      <!-- 🔗 SECCIÓN DE CUENTAS VINCULADAS -->
       <div class="social-section">
         <div class="section-subtitle">
           <span class="link-icon">🔗</span> Cuentas Vinculadas
         </div>
 
         <div class="social-links-container">
+          <!-- Google -->
           <div class="social-item">
             <span class="social-name">🌐 Google</span>
             <button
               v-if="!authStore.user?.googleId"
               @click="linkProvider('google')"
               class="btn-link"
+              :disabled="linkingProvider === 'google'"
             >
-              Vincular
+              {{ linkingProvider === 'google' ? 'Conectando...' : 'Vincular' }}
             </button>
             <span v-else class="status-connected">
               <span class="check">✓</span> Vinculado
             </span>
           </div>
 
+          <!-- GitHub -->
           <div class="social-item">
             <span class="social-name">🐙 GitHub</span>
             <button
               v-if="!authStore.user?.githubId"
               @click="linkProvider('github')"
               class="btn-link"
+              :disabled="linkingProvider === 'github'"
             >
-              Vincular
+              {{ linkingProvider === 'github' ? 'Conectando...' : 'Vincular' }}
             </button>
             <span v-else class="status-connected">
               <span class="check">✓</span> Vinculado
             </span>
           </div>
 
+          <!-- Lichess -->
           <div class="social-item">
             <span class="social-name">♟️ Lichess</span>
             <button
               v-if="!authStore.user?.lichessId"
               @click="linkProvider('lichess')"
               class="btn-link"
+              :disabled="linkingProvider === 'lichess'"
             >
-              Vincular
+              {{ linkingProvider === 'lichess' ? 'Conectando...' : 'Vincular' }}
             </button>
             <span v-else class="status-connected">
               <span class="check">✓</span> Vinculado
@@ -175,8 +183,15 @@ const originalData = ref({
 
 const errorMessage = ref('');
 const successMessage = ref('');
+const linkingProvider = ref<string | null>(null);
 
-onMounted(() => {
+onMounted(async () => {
+  // 1. Refrescar los datos del perfil desde el Backend para obtener las IDs sociales recién vinculadas
+  if (typeof authStore.fetchProfile === 'function') {
+    await authStore.fetchProfile();
+  }
+
+  // 2. Cargar datos en el formulario
   if (authStore.user) {
     form.value.nick = authStore.user.nick || '';
     form.value.email = authStore.user.email || '';
@@ -186,18 +201,24 @@ onMounted(() => {
     };
   }
 
+  // 3. Procesar respuestas devueltas en la URL tras volver del OAuth
   if (route.query.linked) {
-    successMessage.value = `¡Cuenta de ${route.query.linked} vinculada exitosamente!`;
+    const providerName = String(route.query.linked);
+    const formattedProvider = providerName.charAt(0).toUpperCase() + providerName.slice(1);
+    successMessage.value = `¡Cuenta de ${formattedProvider} vinculada exitosamente!`;
     router.replace({ query: {} });
   } else if (route.query.error) {
-    errorMessage.value = 'Hubo un error al intentar vincular la cuenta.';
+    errorMessage.value = 'Hubo un error al intentar vincular la cuenta o ya está vinculada a otro usuario.';
     router.replace({ query: {} });
   }
 });
 
 const linkProvider = (provider: string) => {
+  linkingProvider.value = provider;
   const token = authStore.token || localStorage.getItem('token');
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://ajedrez-backend-scym.onrender.com';
+  
+  // Redirección con el token
   window.location.href = `${backendUrl}/api/auth/link/${provider}?token=${token}`;
 };
 
