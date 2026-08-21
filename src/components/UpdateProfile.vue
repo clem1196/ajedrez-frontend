@@ -190,7 +190,7 @@ onMounted(async () => {
   if (typeof authStore.fetchProfile === 'function') {
     await authStore.fetchProfile();
   }
-
+  console.log('Usuario en Store:', authStore.user);
   // 2. Cargar datos en el formulario
   if (authStore.user) {
     form.value.nick = authStore.user.nick || '';
