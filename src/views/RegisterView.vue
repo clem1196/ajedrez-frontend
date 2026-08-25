@@ -1,4 +1,5 @@
 <!-- src/views/RegisterView.vue -->
+<!-- src/views/RegisterView.vue -->
 <template>
   <div class="auth-container">
     <div class="auth-card glass-card">
@@ -30,12 +31,17 @@
             maxLength="15"
             minlength="3"
             pattern="[A-Za-z0-9_]+"
+            @input="clearNickError"
           />
           <small class="help-text" style="color: #4ade80;" v-if="inheritedElo > 1200">
             🚀 Guardarás tu cuenta con <strong>{{ inheritedElo }}</strong> Elo. ¡Felicidades por tu victoria!
           </small>
           <small class="help-text" style="color: #cbd5e1;" v-else>
             🛡️ Comenzarás con <strong>{{ inheritedElo }}</strong> Elo.
+          </small>
+          <!-- Mensaje de error específico para nombre reservado -->
+          <small v-if="nickError" class="help-text" style="color: #f87171;">
+            ❌ {{ nickError }}
           </small>
         </div>
 
@@ -88,10 +94,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useAuthStore } from '../stores/authStore';
 import { useGameStore } from '../stores/gameStore';
 import { useRouter } from 'vue-router';
+import { BOT_NAMES_LOWERCASE } from '../config/reservedNames';
 
 const authStore = useAuthStore();
 const gameStore = useGameStore();
@@ -101,6 +108,7 @@ const errorMessage = ref('');
 const successMessage = ref('');
 const showPassword = ref(false);
 const inheritedElo = ref(1200);
+const nickError = ref(''); // Error específico para el nick
 
 const formData = reactive({
   nick: '',
@@ -108,30 +116,54 @@ const formData = reactive({
   password: '',
 });
 
-// ✅ Validación del formulario
+// ✅ Validación del formulario (incluyendo nombre reservado)
 const isFormValid = computed(() => {
-  return (
-    formData.nick.trim().length >= 3 &&
-    formData.nick.trim().length <= 15 &&
-    /^[A-Za-z0-9_]+$/.test(formData.nick) &&
-    formData.email.trim() !== '' &&
-    formData.password.length >= 6
-  );
+  const nick = formData.nick.trim();
+  const nickLower = nick.toLowerCase();
+  const validLength = nick.length >= 3 && nick.length <= 15;
+  const validChars = /^[A-Za-z0-9_]+$/.test(nick);
+  const validEmail = formData.email.trim() !== '';
+  const validPassword = formData.password.length >= 6;
+  const isReserved = BOT_NAMES_LOWERCASE.includes(nickLower);
+
+  // Actualizar mensaje de error específico del nick
+  if (nick && isReserved) {
+    nickError.value = `El nombre "${nick}" está reservado para bots. Por favor, elige otro.`;
+  } else if (nick && !validChars) {
+    nickError.value = 'Solo se permiten letras, números y guión bajo.';
+  } else if (nick && (nick.length < 3 || nick.length > 15)) {
+    nickError.value = 'El nick debe tener entre 3 y 15 caracteres.';
+  } else {
+    nickError.value = '';
+  }
+
+  return validLength && validChars && validEmail && validPassword && !isReserved;
+});
+
+// Limpiar error al escribir (ya se actualiza en el computed)
+const clearNickError = () => {
+  // El computed se encarga de actualizar nickError
+};
+
+// Watch para mantener sincronizado el error al cambiar el nick
+watch(() => formData.nick, () => {
+  // Forzar reevaluación del computed (ya se actualiza automáticamente)
+  isFormValid.value;
 });
 
 onMounted(() => {
-  // ✅ Recuperar datos de la partida del invitado
+  // Recuperar datos de la partida del invitado
   const currentNick = gameStore.nick || sessionStorage.getItem('guest_backup_nick') || '';
   
-  // ✅ Calcular Elo final (base + cambio)
+  // Calcular Elo final (base + cambio)
   let baseElo = gameStore.elo || Number(sessionStorage.getItem('guest_backup_elo')) || 1200;
   let eloChange = 0;
 
-  // ✅ Si hay cambio de Elo registrado en el store
+  // Si hay cambio de Elo registrado en el store
   if (gameStore.eloChange !== undefined && gameStore.eloChange !== 0) {
     eloChange = gameStore.eloChange;
   } else {
-    // ✅ Calcular cambio basado en el mensaje de fin de partida
+    // Calcular cambio basado en el mensaje de fin de partida
     const msg = (gameStore.endGameMessage || '').toLowerCase();
     if (!msg.includes('tablas') && !msg.includes('empate') && msg.length > 0) {
       const iAmWhite = gameStore.myColor === 'w';
@@ -151,7 +183,7 @@ onMounted(() => {
     }
   }
 
-  // ✅ Asignar valores al formulario
+  // Asignar valores al formulario
   if (currentNick) {
     formData.nick = currentNick;
     inheritedElo.value = Math.max(1200, baseElo + eloChange); // Nunca menos de 1200
@@ -160,7 +192,7 @@ onMounted(() => {
     inheritedElo.value = 1200;
   }
 
-  // ✅ Guardar respaldo en sessionStorage
+  // Guardar respaldo en sessionStorage
   if (currentNick) {
     sessionStorage.setItem('guest_backup_nick', currentNick);
     sessionStorage.setItem('guest_backup_elo', String(inheritedElo.value));
@@ -168,6 +200,16 @@ onMounted(() => {
 });
 
 const handleRegister = async () => {
+  // Validaciones finales antes de enviar
+  const nick = formData.nick.trim();
+  const nickLower = nick.toLowerCase();
+  
+  // Validar nombre reservado (por si acaso el computed falla)
+  if (BOT_NAMES_LOWERCASE.includes(nickLower)) {
+    errorMessage.value = `❌ El nombre "${nick}" está reservado para bots. Por favor, elige otro.`;
+    return;
+  }
+
   if (!isFormValid.value) {
     errorMessage.value = 'Por favor, completa todos los campos correctamente.';
     return;
@@ -177,7 +219,7 @@ const handleRegister = async () => {
   successMessage.value = '';
 
   try {
-    // ✅ Registrar usuario con el Elo heredado
+    // Registrar usuario con el Elo heredado
     const res = await authStore.register({
       nick: formData.nick.trim(),
       email: formData.email.trim(),
@@ -188,7 +230,7 @@ const handleRegister = async () => {
     if (res.success) {
       successMessage.value = '✅ ¡Cuenta guardada con éxito! Tu Elo ha sido respaldado.';
 
-      // ✅ Auto-login para experiencia fluida
+      // Auto-login para experiencia fluida
       const loginRes = await authStore.login({
         email: formData.email,
         password: formData.password
@@ -201,7 +243,7 @@ const handleRegister = async () => {
         }
         gameStore.resetGame();
         
-        // ✅ Limpiar respaldos de sesión
+        // Limpiar respaldos de sesión
         sessionStorage.removeItem('guest_backup_nick');
         sessionStorage.removeItem('guest_backup_elo');
         
@@ -219,6 +261,9 @@ const handleRegister = async () => {
 };
 </script>
 
+<style scoped>
+/* (Aquí van tus estilos existentes) */
+</style>
 <style scoped>
 .auth-container {
   display: flex;

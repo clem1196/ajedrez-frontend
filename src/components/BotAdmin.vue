@@ -20,15 +20,7 @@
           </span>
         </div>
 
-        <div class="difficulty-container">
-          <label class="difficulty-label">Dificultad:</label>
-          <div class="difficulty-options">
-            <button v-for="level in difficultyLevels" :key="level" class="difficulty-btn"
-              :class="{ active: currentDifficulty === level }" @click="setDifficulty(level)">
-              {{ getDifficultyLabel(level) }}
-            </button>
-          </div>
-        </div>
+        <!-- 👇 Sección de dificultad ELIMINADA -->
 
         <div class="config-slider">
           <label class="slider-label">
@@ -75,12 +67,13 @@
         <button class="btn-accept" @click="showConfirmModal = true">✅ Aceptar</button>
       </div>
     </div>
-    <!-- ✅ Modal de confirmación -->
+
+    <!-- Modal de confirmación (sin cambios) -->
     <div v-if="showConfirmModal" class="modal-overlay" @click.self="showConfirmModal = false">
       <div class="modal-content">
         <h3>💾 Guardar configuración</h3>
         <p>¿Deseas guardar los cambios realizados en la configuración de bots?</p>
-         <div class="modal-actions">
+        <div class="modal-actions">
           <button class="btn-modal-cancel" @click="showConfirmModal = false">
             ❌ Cancelar
           </button>
@@ -100,31 +93,35 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-// ✅ Estado local (Fuente de verdad de la UI)
+// ✅ Estado local
 const botsEnabled = ref(true);
-const currentDifficulty = ref('easy');
 const botProbability = ref(100);
 const minPlayersToDisable = ref(5);
 const botStats = ref({ total: 0, active: 0, names: [] as string[] });
 const loading = ref(false);
 const saving = ref(false);
-const showConfirmModal = ref(false); 
+const showConfirmModal = ref(false);
 
-// 🎯 Actualizado a los 4 niveles calibrados
-const difficultyLevels = ['easy', 'medium', 'hard', 'grandmaster'];
-
-// ✅ Etiquetas legibles para la interfaz
-const getDifficultyLabel = (level: string) => {
-  const labels: Record<string, string> = { 
-    easy: 'Fácil', 
-    medium: 'Medio', 
-    hard: 'Difícil',
-    grandmaster: 'Gran Maestro'
-  };
-  return labels[level] || level;
+// ✅ Funciones
+const toggleBots = () => {
+  botsEnabled.value = !botsEnabled.value;
 };
 
-// ✅ Confirmar y guardar cambios
+const updateConfig = async () => {
+  try {
+    await api.post('/admin/bot-config', {
+      enabled: botsEnabled.value,
+      botProbability: botProbability.value,
+      minPlayersToDisable: minPlayersToDisable.value
+      // 👈 ya no se envía difficulty
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ Error actualizando configuración:', error);
+    return false;
+  }
+};
+
 const confirmAccept = async () => {
   saving.value = true;
   try {
@@ -136,7 +133,6 @@ const confirmAccept = async () => {
         router.push('/');
       }, 300);
     } else {
-      console.log(success)
       alert('Error al guardar la configuración. Por favor, intenta nuevamente.');
     }
   } catch (error) {
@@ -144,29 +140,6 @@ const confirmAccept = async () => {
     alert('Error de conexión al guardar la configuración.');
   } finally {
     saving.value = false;
-  }
-};
-
-const toggleBots = () => {
-  botsEnabled.value = !botsEnabled.value;
-};
-
-const setDifficulty = (level: string) => {
-  currentDifficulty.value = level;
-};
-
-const updateConfig = async () => {
-  try {
-    await api.post('/admin/bot-config', {
-      enabled: botsEnabled.value,
-      difficulty: currentDifficulty.value,
-      botProbability: botProbability.value,
-      minPlayersToDisable: minPlayersToDisable.value
-    });
-    return true;
-  } catch (error) {
-    console.error('❌ Error actualizando configuración:', error);
-    return false;
   }
 };
 
@@ -179,7 +152,7 @@ const loadStats = async () => {
       
       const config = response.data.data.config || {};
       botsEnabled.value = config.enabled ?? config.ENABLED ?? true;
-      currentDifficulty.value = config.difficulty ?? config.DIFFICULTY ?? 'easy';
+      // 👇 ya no se asigna currentDifficulty
       botProbability.value = config.botProbability ?? config.BOT_PROBABILITY ?? 100;
       minPlayersToDisable.value = config.minPlayersToDisable ?? config.MIN_PLAYERS_TO_DISABLE_BOTS ?? 5;
     }
@@ -192,9 +165,9 @@ const loadStats = async () => {
 
 const resetConfig = async () => {
   botsEnabled.value = true;
-  currentDifficulty.value = 'easy';
   botProbability.value = 100;
   minPlayersToDisable.value = 5;
+  // 👇 ya no se resetea currentDifficulty
   
   const success = await updateConfig();
   if (success) {

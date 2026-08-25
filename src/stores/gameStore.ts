@@ -1,7 +1,6 @@
 // src/stores/gameStore.ts
 import { defineStore } from "pinia";
 import { socket } from "../services/socketService";
-import type { Key } from "chessground/types";
 import { useAuthStore } from "./authStore";
 
 export const useGameStore = defineStore("game", {
