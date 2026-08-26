@@ -2,6 +2,7 @@
 import { defineStore } from "pinia";
 import { socket } from "../services/socketService";
 import { useAuthStore } from "./authStore";
+import type { StartGamePayload } from "@/types/typesStartGame";
 
 export const useGameStore = defineStore("game", {
   state: () => ({
@@ -154,7 +155,7 @@ export const useGameStore = defineStore("game", {
     },
 
     // ✅ CORREGIDO: startGame con guardado en sessionStorage
-    startGame(data: any) {
+    startGame(data: StartGamePayload) {
       this.roomId = data.roomId;
       this.currentFen = data.fen;
       this.lastMove = [];
@@ -210,7 +211,7 @@ export const useGameStore = defineStore("game", {
       }
 
       // ✅ Mensaje si es un bot
-     /* if (this.isBotOpponent) {
+      /* if (this.isBotOpponent) {
         console.log(`🤖 Estás jugando contra un bot: ${this.opponentNick}`);
         this.addSystemMessage(
           `🤖 Has sido emparejado con el bot ${this.opponentNick}`,
@@ -308,7 +309,6 @@ export const useGameStore = defineStore("game", {
       this.gameStarted = false;
       this.chatAvailable = false;
       this.lastMoveReceived = null;
-      this.resetReconnectionState();
       this.isBotOpponent = false;
       const syncSeconds = (this.selectedMinutes || 10) * 60;
       this.whiteTime = syncSeconds;
@@ -323,6 +323,11 @@ export const useGameStore = defineStore("game", {
       this.eloChange = 0;
       this.opponentEloChange = 0;
       this.messages = [];
+      this.systemMessages = [];
+      this.resetReconnectionState();
+      this.afkWarning = "";
+      this.afkCountdown = 0;
+      this.opponentAfkMessage = "";
       this.drawOfferedByOpponent = false;
       this.moveCount = 0;
 
