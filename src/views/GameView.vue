@@ -653,54 +653,11 @@ onBeforeMount(() => {
     }
   }
 });
-// ---------------------------------------------------------
-// 🔄 MANEJADORES DE SOCKET PARA REVANCHA
-// ---------------------------------------------------------
-const handleRematchRequested = () => {
-  gameStore.rematchOfferedByOpponent = true;
-  alert('📢 Tu oponente pide revancha. ¿Aceptar o rechazar?');
-};
-const handleRematchAccepted = () => {
-  gameStore.iRequestedRematch = false;
-  gameStore.rematchOfferedByOpponent = false;
-};
-const handleRematchDeclined = () => {
-  gameStore.iRequestedRematch = false;
-  gameStore.rematchOfferedByOpponent = false;
-  gameStore.rematchDeclinedByOpponent = true;
-  alert('El oponente rechazó la revancha.');
-};
 
-const handleGameStarted = (data: any) => {
-  // 1. Actualizar todo el Pinia Store con la nueva sala y nuevo color/FEN
-  gameStore.startGame(data);
-
-  // 2. Resetear estados locales de la vista
-  drawOfferPending.value = false;
-  drawOfferNotification.value = false;
-
-  // 3. Forzar al tablero a cargar el FEN inicial y la nueva configuración
-  if (boardAPI.value) {
-    boardAPI.value.setConfig({
-      fen: data.fen,
-      lastMove: undefined,
-      orientation: gameStore.myColor === 'w' ? 'white' : 'black',
-    });
-  }
-
-  // 4. Si el jugador humano es Blancas, iniciar el temporizador de cortesía
-  if (gameStore.myColor === 'w') {
-    startCourtesyTimer();
-  }
-};
 onMounted(() => {
   console.log(currentWidth.value)
   window.addEventListener('resize', updateWidth)
-  // Suscribirse a los eventos de revancha
-  socket.on('rematch_requested', handleRematchRequested);
-  socket.on('rematch_accepted', handleRematchAccepted);
-  socket.on('rematch_declined', handleRematchDeclined);
-  socket.on('game_started', handleGameStarted);
+  
   if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
     startCourtesyTimer();
   }
@@ -710,11 +667,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateWidth)
   // ✅ SOLO limpiamos timers locales. NUNCA uses socket.off() aquí.
   stopCourtesyTimer();
-  // Limpiar suscripciones para evitar fugas de memoria o disparos múltiples
-   socket.off('rematch_requested', handleRematchRequested);
-  socket.off('rematch_accepted', handleRematchAccepted);
-  socket.off('rematch_declined', handleRematchDeclined);
-  socket.off('game_started', handleGameStarted);
+ 
 });
 </script>
 
