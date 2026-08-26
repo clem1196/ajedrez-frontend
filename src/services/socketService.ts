@@ -407,7 +407,8 @@ socket.on("rematch_requested", () => {
   const gameStore = useGameStore();
   console.log("🔥 ¡El oponente solicitó una revancha directa!");
   gameStore.rematchOfferedByOpponent = true;
-  gameStore.gameEnded = true;
+  gameStore.rematchDeclinedByOpponent = false;
+  gameStore.iRequestedRematch = false;
 });
 
 // 🚨 2. El oponente rechazó nuestra oferta de revancha
