@@ -656,11 +656,14 @@ onBeforeMount(() => {
 // ---------------------------------------------------------
 // 🔄 MANEJADORES DE SOCKET PARA REVANCHA
 // ---------------------------------------------------------
+const handleRematchRequested = () => {
+  gameStore.rematchOfferedByOpponent = true;
+  alert('📢 Tu oponente pide revancha. ¿Aceptar o rechazar?');
+};
 const handleRematchAccepted = () => {
   gameStore.iRequestedRematch = false;
   gameStore.rematchOfferedByOpponent = false;
 };
-
 const handleRematchDeclined = () => {
   gameStore.iRequestedRematch = false;
   gameStore.rematchOfferedByOpponent = false;
@@ -694,6 +697,7 @@ onMounted(() => {
   console.log(currentWidth.value)
   window.addEventListener('resize', updateWidth)
   // Suscribirse a los eventos de revancha
+  socket.on('rematch_requested', handleRematchRequested);
   socket.on('rematch_accepted', handleRematchAccepted);
   socket.on('rematch_declined', handleRematchDeclined);
   socket.on('game_started', handleGameStarted);
@@ -707,6 +711,7 @@ onUnmounted(() => {
   // ✅ SOLO limpiamos timers locales. NUNCA uses socket.off() aquí.
   stopCourtesyTimer();
   // Limpiar suscripciones para evitar fugas de memoria o disparos múltiples
+   socket.off('rematch_requested', handleRematchRequested);
   socket.off('rematch_accepted', handleRematchAccepted);
   socket.off('rematch_declined', handleRematchDeclined);
   socket.off('game_started', handleGameStarted);
