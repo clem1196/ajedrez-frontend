@@ -27,6 +27,7 @@ export const useGameStore = defineStore("game", {
     moveDeadline: 0,
     gameStarted: false,
     drawOfferedByOpponent: false,
+    
     gameEnded: false,
     endGameMessage: "",
     moveCount: 0,
@@ -153,8 +154,6 @@ export const useGameStore = defineStore("game", {
         this.opponentIsGuest = !data.playerWhite.isRegistered;
       }
     },
-
-    // ✅ CORREGIDO: startGame con guardado en sessionStorage
     startGame(data: StartGamePayload) {
       this.roomId = data.roomId;
       this.currentFen = data.fen;
@@ -181,12 +180,11 @@ export const useGameStore = defineStore("game", {
       console.log(`[Pinia] Mi Socket ID Local es: "${socket.id}"`);
       console.log(`[Pinia] ID recibido para Blancas: "${data.white.id}"`);
 
-      // ✅ Asignar color y detectar bot correctamente
+      // ✅ Validación estricta de socket.id en startGame
       if (socket.id === data.white.id) {
         this.myColor = "w";
         this.opponentNick = data.black.nick;
         this.opponentElo = data.black.elo || 1200;
-        // ✅ Detectar si el oponente es un bot
         this.isBotOpponent =
           data.black.isBot ||
           data.black.nick?.toLowerCase().includes("bot_") ||
@@ -195,11 +193,10 @@ export const useGameStore = defineStore("game", {
           "%c🟢 Asignado con éxito: Eres BLANCAS",
           "color: #00ff00; font-weight: bold;",
         );
-      } else {
+      } else if (socket.id === data.black.id) {
         this.myColor = "b";
         this.opponentNick = data.white.nick;
         this.opponentElo = data.white.elo || 1200;
-        // ✅ Detectar si el oponente es un bot
         this.isBotOpponent =
           data.white.isBot ||
           data.white.nick?.toLowerCase().includes("bot_") ||
@@ -208,15 +205,21 @@ export const useGameStore = defineStore("game", {
           "%c🟢 Asignado con éxito: Eres NEGRAS",
           "color: #00ff00; font-weight: bold;",
         );
-      }
+      } else {
+        // Respaldo por nickname si el socketId cambió justo antes del evento (reconexión express)
+        const authStore = useAuthStore();
+        const myNick = authStore.isAuthenticated
+          ? authStore.currentNick
+          : this.nick;
 
-      // ✅ Mensaje si es un bot
-      /* if (this.isBotOpponent) {
-        console.log(`🤖 Estás jugando contra un bot: ${this.opponentNick}`);
-        this.addSystemMessage(
-          `🤖 Has sido emparejado con el bot ${this.opponentNick}`,
-        );
-      }*/
+        if (myNick && data.white.nick === myNick) {
+          this.myColor = "w";
+          this.opponentNick = data.black.nick;
+        } else {
+          this.myColor = "b";
+          this.opponentNick = data.white.nick;
+        }
+      }
 
       // ✅ Guardar en sessionStorage DESPUÉS de asignar myColor
       const authStore = useAuthStore();

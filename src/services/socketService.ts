@@ -29,7 +29,9 @@ const attemptReconnection = (roomId: string, nick: string) => {
   if (isReconnecting) return;
 
   isReconnecting = true;
-  console.log(`🔄 [Socket] Solicitando reconexión a sala ${roomId} como ${nick}`);
+  console.log(
+    `🔄 [Socket] Solicitando reconexión a sala ${roomId} como ${nick}`,
+  );
 
   socket.emit("reconnect_to_room", {
     roomId,
@@ -44,17 +46,20 @@ const attemptReconnection = (roomId: string, nick: string) => {
 socket.on("game_started", (data) => {
   console.log("⚔️ ¡EVENTO GAME_STARTED DETECTADO!", data);
 
-  const gameStore = useGameStore();
-  gameStore.startGame(data);
-
-  // Guardar en sessionStorage para permitir recarga de página (F5)
-  if (data.roomId && data.myNick) {
-    sessionStorage.setItem("game_room_id", data.roomId);
-    sessionStorage.setItem("game_player_nick", data.myNick);
-    sessionStorage.setItem("game_my_color", data.myColor);
+  // 1. Unir el socket activo explícitamente a la nueva sala en el servidor
+  if (data.roomId) {
+    socket.emit("join_room", { roomId: data.roomId });
   }
 
-  router.push("/game");
+  const gameStore = useGameStore();
+
+  // 2. Delegar todo el reseteo de la revancha y guardado en sessionStorage a Pinia
+  gameStore.startGame(data);
+
+  // 3. Redirigir únicamente si el usuario no está en la vista del tablero
+  if (router.currentRoute.value.path !== "/game") {
+    router.push("/game");
+  }
 });
 
 socket.on(
@@ -75,7 +80,7 @@ socket.on(
     if (data.move?.from && data.move?.to) {
       gameStore.lastMove = [data.move.from, data.move.to];
     }
-  }
+  },
 );
 
 socket.on("connect", () => {
@@ -120,7 +125,7 @@ socket.on(
     gameStore.isReconnecting = false;
 
     console.log("🎮 Partida reanudada tras reconexión");
-  }
+  },
 );
 
 socket.on("disconnect", (reason) => {
@@ -134,13 +139,16 @@ socket.on("disconnect", (reason) => {
   }
 });
 
-socket.on("player_disconnected", (data: { message: string; waitingTime: number }) => {
-  const gameStore = useGameStore();
-  gameStore.opponentDisconnected = true;
-  gameStore.opponentDisconnectedMessage = data.message;
-  gameStore.reconnectionTime = data.waitingTime;
-  gameStore.isPaused = true;
-});
+socket.on(
+  "player_disconnected",
+  (data: { message: string; waitingTime: number }) => {
+    const gameStore = useGameStore();
+    gameStore.opponentDisconnected = true;
+    gameStore.opponentDisconnectedMessage = data.message;
+    gameStore.reconnectionTime = data.waitingTime;
+    gameStore.isPaused = true;
+  },
+);
 
 socket.on("player_reconnected", (data: { message: string }) => {
   const gameStore = useGameStore();
@@ -176,7 +184,7 @@ socket.on(
     gameStore.isReconnecting = false;
 
     if (isReconnecting) resetReconnectionState();
-  }
+  },
 );
 
 socket.on("illegal_move", (data: { fen: string }) => {
@@ -188,7 +196,12 @@ socket.on("draw_offered", () => {
   const gameStore = useGameStore();
   gameStore.drawOfferedByOpponent = true;
 });
-
+socket.on("draw_declined", () => {
+  const gameStore = useGameStore();
+  // Limpia el estado de oferta enviada en el store
+  gameStore.drawOfferedByOpponent = false;
+  
+});
 socket.on("draw_offer_canceled", () => {
   const gameStore = useGameStore();
   gameStore.drawOfferedByOpponent = false;
@@ -217,14 +230,17 @@ socket.on(
     } else {
       gameStore.opponentAfkMessage = data.message;
     }
-  }
+  },
 );
 
-socket.on("afk_countdown_update", (data: { timeRemaining: number; message: string }) => {
-  const gameStore = useGameStore();
-  gameStore.afkCountdown = data.timeRemaining;
-  gameStore.afkWarning = data.message;
-});
+socket.on(
+  "afk_countdown_update",
+  (data: { timeRemaining: number; message: string }) => {
+    const gameStore = useGameStore();
+    gameStore.afkCountdown = data.timeRemaining;
+    gameStore.afkWarning = data.message;
+  },
+);
 
 socket.on(
   "bot_joined",
@@ -237,7 +253,7 @@ socket.on(
       gameStore.opponentElo = data.elo;
       gameStore.isBotOpponent = true;
     }
-  }
+  },
 );
 
 socket.on(
@@ -263,26 +279,42 @@ socket.on(
 
     resetReconnectionState();
 
-    sessionStorage.removeItem("game_room_id");
-    sessionStorage.removeItem("game_player_nick");
-    sessionStorage.removeItem("game_my_color");
+    //sessionStorage.removeItem("game_room_id");
+    //sessionStorage.removeItem("game_player_nick");
+    //sessionStorage.removeItem("game_my_color");
 
     if (data.winnerMessage && data.loserMessage) {
-      gameStore.endGameMessage = socket.id !== data.loserSocketId ? data.winnerMessage : data.loserMessage;
+      gameStore.endGameMessage =
+        socket.id !== data.loserSocketId
+          ? data.winnerMessage
+          : data.loserMessage;
     } else if (data.reason === "surrender") {
-      gameStore.endGameMessage = socket.id === data.loserSocketId ? "Derrota: Perdiste por abandono." : "Victoria: Ganaste por abandono del oponente.";
+      gameStore.endGameMessage =
+        socket.id === data.loserSocketId
+          ? "Derrota: Perdiste por abandono."
+          : "Victoria: Ganaste por abandono del oponente.";
     } else if (data.reason === "inactivity_kick") {
-      gameStore.endGameMessage = socket.id === data.loserSocketId ? "Derrota: Perdiste por inactividad." : "Victoria: Ganaste por inactividad del oponente.";
+      gameStore.endGameMessage =
+        socket.id === data.loserSocketId
+          ? "Derrota: Perdiste por inactividad."
+          : "Victoria: Ganaste por inactividad del oponente.";
     } else if (data.reason === "checkmate") {
-      gameStore.endGameMessage = socket.id === data.loserSocketId ? "Derrota por jaque mate." : "Victoria por jaque mate.";
+      gameStore.endGameMessage =
+        socket.id === data.loserSocketId
+          ? "Derrota por jaque mate."
+          : "Victoria por jaque mate.";
     } else if (data.reason === "aborted") {
-      gameStore.endGameMessage = "Partida Abortada: No se alteró la puntuación.";
+      gameStore.endGameMessage =
+        "Partida Abortada: No se alteró la puntuación.";
     } else {
       gameStore.endGameMessage = data.message;
     }
 
     if (data.reason !== "aborted" && data.reason !== "abort_by_inactivity") {
-      if (data.whiteEloChange !== undefined && data.blackEloChange !== undefined) {
+      if (
+        data.whiteEloChange !== undefined &&
+        data.blackEloChange !== undefined
+      ) {
         if (gameStore.myColor === "w") {
           gameStore.eloChange = data.whiteEloChange;
           gameStore.opponentEloChange = data.blackEloChange;
@@ -293,7 +325,9 @@ socket.on(
       }
 
       if (authStore.user && data.players?.length) {
-        const myMatchData = data.players.find((p) => p.nick === authStore.user?.nick);
+        const myMatchData = data.players.find(
+          (p) => p.nick === authStore.user?.nick,
+        );
         if (myMatchData) {
           authStore.user.elo = myMatchData.newElo;
           const storedUser = localStorage.getItem("user");
@@ -309,9 +343,14 @@ socket.on(
         }
       }
     }
-  }
+  },
 );
-
+socket.on("accept_rematch", () => {
+  const gameStore = useGameStore();  
+  gameStore.rematchOfferedByOpponent = false;
+  gameStore.rematchDeclinedByOpponent = false;
+  gameStore.iRequestedRematch = false;
+});
 socket.on("rematch_requested", () => {
   const gameStore = useGameStore();
   gameStore.rematchOfferedByOpponent = true;

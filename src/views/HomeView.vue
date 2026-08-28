@@ -32,7 +32,7 @@
         </div>
 
         <div class="time-selector-container">
-          <label class="time-label">Selecciona el Ritmo de Juego:</label>
+          <label class="time-label">Selecciona el ritmo de juego:</label>
           <div class="time-options">
             <button 
               type="button"

@@ -50,7 +50,7 @@
           </div>
 
           <!-- Oferta de tablas enviada -->
-          <div v-if="drawOfferNotification" key="draw-offer" class="glass-banner banner-info">
+          <div v-if="drawOfferPending" key="offer_draw" class="glass-banner banner-info">
             <span>🤝 Propuesta de tablas enviada a <strong>{{ gameStore.opponentNick }}</strong></span>
             <button class="btn-banner-action" @click="cancelDrawOffer">Cancelar</button>
           </div>
@@ -64,7 +64,6 @@
           <div class="player-meta">
             <div class="player-name-row">
               <span class="player-name">{{ gameStore.opponentNick || 'Buscando rival...' }}</span>
-
             </div>
             <div class="player-tag" :class="{ 'tag-rated': gameStore.opponentNick }">
               {{ gameStore.opponentNick ? `📈 Elo: ${gameStore.opponentElo}` : 'ESPERANDO' }}
@@ -109,8 +108,7 @@
         '--border': currentTheme?.border,
         '--coordinates': currentTheme?.coordinates,
         '--shadow': currentTheme?.shadow
-      }"
-        :class="{ 'board-blocked': (gameStore.gameStarted && !isMyTurn) || gameStore.gameEnded || gameStore.isPaused }">
+      }" :class="{ 'board-blocked': !isMyTurn || gameStore.gameEnded || gameStore.isPaused }">
         <TheChessboard :board-config="boardConfig" @board-created="handleBoardCreated" @move="handleLocalMove" />
       </main>
 
@@ -150,21 +148,25 @@
         </template>
       </nav>
       <GameChat v-if="currentWidth <= 624" />
+
       <!-- 🪟 MODAL DE RESULTADOS / REVANCHA -->
       <Transition name="modal-fade">
         <div class="game-modal"
-          v-if="gameStore.drawOfferedByOpponent || gameStore.gameEnded || gameStore.rematchOfferedByOpponent || gameStore.iRequestedRematch">
+          v-if="gameStore.drawOfferedByOpponent || gameStore.gameEnded || gameStore.rematchOfferedByOpponent || gameStore.iRequestedRematch || gameStore.rematchDeclinedByOpponent">
           <div class="modal-card">
 
+            <!-- Header del Modal -->
             <header class="modal-header">
               <h3 v-if="gameStore.rematchOfferedByOpponent" class="title-rematch">🔥 ¡Reto Recibido!</h3>
               <h3 v-else-if="gameStore.iRequestedRematch" class="title-waiting">⌛ Desafío Enviado</h3>
+              <h3 v-else-if="gameStore.rematchDeclinedByOpponent" class="title-declined">❌ Revancha Rechazada</h3>
               <h3 v-else-if="gameStore.gameEnded" class="title-ended">
                 {{ gameStore.endGameMessage.includes('Abortada') ? 'Sala Abortada' : 'Fin de la Partida' }}
               </h3>
               <h3 v-else class="title-draw">🤝 ¡Propuesta de Tablas!</h3>
             </header>
 
+            <!-- Cuerpo del Modal -->
             <div class="modal-body">
               <p class="modal-message">
                 <template v-if="gameStore.rematchOfferedByOpponent">
@@ -172,6 +174,9 @@
                 </template>
                 <template v-else-if="gameStore.iRequestedRematch">
                   Esperando respuesta de <strong>{{ gameStore.opponentNick }}</strong>...
+                </template>
+                <template v-else-if="gameStore.rematchDeclinedByOpponent">
+                  <strong>{{ gameStore.opponentNick }}</strong> ha rechazado la solicitud de revancha.
                 </template>
                 <template v-else>
                   {{ gameStore.gameEnded ? gameStore.endGameMessage : `Tu oponente te ofrece declarar tablas.` }}
@@ -195,11 +200,12 @@
                 </div>
               </div>
 
-              <!-- Mensaje de registro para invitados -->
-              <div v-if="gameStore.gameEnded && !gameStore.iRequestedRematch && !gameStore.rematchOfferedByOpponent"
+              <!-- Mensaje de registro / call to action -->
+              <div
+                v-if="gameStore.gameEnded && !gameStore.iRequestedRematch && !gameStore.rematchOfferedByOpponent && !gameStore.rematchDeclinedByOpponent"
                 class="cta-box">
                 <p>
-                  {{ authStore.isAuthenticated ? '¿Qué deseas hacer a continuación?' : `Registrate para guardar tus
+                  {{ authStore.isAuthenticated ? '¿Qué deseas hacer a continuación?' : `Regístrate para guardar tus
                   estadísticas y subir en el Ranking.` }}
                 </p>
               </div>
@@ -207,27 +213,43 @@
 
             <!-- Botones del Modal -->
             <footer class="modal-actions">
-              <!-- Oferta de Tablas -->
+
+              <!-- 1. Propuesta de Tablas en partida activa -->
               <template v-if="gameStore.drawOfferedByOpponent && !gameStore.gameEnded">
                 <button class="btn-glass btn-glass-success" @click="acceptDraw">🤝 Aceptar</button>
                 <button class="btn-glass btn-glass-danger" @click="gameStore.drawOfferedByOpponent = false">❌
                   Rechazar</button>
               </template>
 
-              <!-- Esperando Revancha -->
+              <!-- 2. Esperando respuesta de mi solicitud de revancha -->
               <template v-else-if="gameStore.iRequestedRematch">
                 <div class="spinner-small"></div>
                 <button class="btn-glass btn-glass-danger full-width" @click="cancelRematch">❌ Cancelar
                   Solicitud</button>
               </template>
 
-              <!-- Revancha Recibida -->
+              <!-- 3. Solicitud de Revancha recibida del oponente -->
               <template v-else-if="gameStore.rematchOfferedByOpponent">
                 <button class="btn-glass btn-glass-success" @click="acceptRematch">⚔️ Aceptar Revancha</button>
-                <button class="btn-glass btn-glass-danger" @click="declineRematch">Rechazar</button>
+                <button class="btn-glass btn-glass-danger" @click="declineRematch">❌ Rechazar</button>
               </template>
 
-              <!-- Fin de Partida / Opciones Post-Game -->
+              <!-- 4. Si el oponente rechazó la revancha -->
+              <template v-else-if="gameStore.rematchDeclinedByOpponent">
+                <div class="actions-grid">
+                  <button v-if="authStore.isAuthenticated" class="btn-glass btn-glass-success" @click="handlePlay">
+                    🎮 Buscar Otro Rival
+                  </button>
+                  <button v-else class="btn-glass btn-glass-accent" @click="goToRegister">
+                    💎 Crear Cuenta
+                  </button>
+                </div>
+                <button class="btn-link" @click="exitGame">
+                  ← Volver al Menú Principal
+                </button>
+              </template>
+
+              <!-- 5. Fin de Partida / Opciones Post-Game Estándar -->
               <template v-else>
                 <div class="actions-grid">
                   <button v-if="!gameStore.endGameMessage.includes('Abortada')" class="btn-glass btn-glass-primary"
@@ -235,8 +257,8 @@
                     ⚔️ Pedir Revancha
                   </button>
 
-                  <button v-if="gameStore.endGameMessage.includes('Abortada') || gameStore.rematchDeclinedByOpponent"
-                    class="btn-glass btn-glass-primary" @click="rematchGame">
+                  <button v-if="gameStore.endGameMessage.includes('Abortada')" class="btn-glass btn-glass-primary"
+                    @click="rematchGame">
                     🔄 Nueva Partida
                   </button>
 
@@ -253,6 +275,7 @@
                   ← Volver al Menú Principal
                 </button>
               </template>
+
             </footer>
 
           </div>
@@ -263,7 +286,6 @@
     <GameChat v-if="currentWidth > 624" />
   </div>
 </template>
-
 
 <script setup lang="ts">
 import { computed, onBeforeMount, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -285,7 +307,7 @@ const { isMuted, playSound, toggleMute } = useAudio();
 const gameStore = useGameStore();
 const authStore = useAuthStore();
 
-// ✅ Estado local SOLO para UI que no necesita estar en el store global
+// ✅ Estado local SOLO para UI
 const currentWidth = ref(window.innerWidth);
 const drawOfferPending = ref(false);
 const drawOfferNotification = ref(false);
@@ -297,59 +319,63 @@ const currentThemeId = ref(localStorage.getItem('chess_theme') || 'green');
 watch(currentThemeId, (newTheme) => {
   localStorage.setItem('chess_theme', newTheme);
 });
+
 const boardBackground = computed(() => {
   if (!currentTheme.value) return '';
-
   return createBoardBackground(
     currentTheme.value.light,
     currentTheme.value.dark
   );
 });
+
 const currentTheme = computed(() =>
   boardThemes.find(t => t.id === currentThemeId.value) ?? boardThemes[0]
 );
+
 const boardAPI = ref<BoardApi | null>(null);
 
 function handleBoardCreated(api: BoardApi) {
   boardAPI.value = api;
 }
+
+// 🎯 CONTROL DE TURNO CORREGIDO
+const fenTurn = computed(() => {
+  if (!gameStore.currentFen) return 'w';
+  const parts = gameStore.currentFen.split(' ');
+  return parts[1] || 'w'; // 'w' o 'b'
+});
+
+const isMyTurn = computed(() => {
+  if (gameStore.gameEnded || gameStore.isPaused) return false;
+  return fenTurn.value === gameStore.myColor;
+});
+
+// 🏁 CONFIGURACIÓN DEL TABLERO
 const boardConfig = computed(() => {
   const myColorFull: "white" | "black" = gameStore.myColor === 'w' ? 'white' : 'black';
-  const canIMove = !gameStore.gameEnded &&
-    !gameStore.isPaused &&
-    ((gameStore.moveCount === 0 && gameStore.myColor === 'w') || isMyTurn.value);
+  const canMove = isMyTurn.value && !gameStore.gameEnded && !gameStore.isPaused;
 
   return {
     coordinates: true,
     fen: gameStore.currentFen,
     orientation: myColorFull,
-    turnColor: currentTurnColor.value,
-    // 👇 Pasamos el movimiento formateado que forzará el resaltado
     lastMove: formattedLastMove.value,
-
     animation: { enabled: shouldAnimate.value, duration: 200 },
     movable: {
-      color: canIMove ? myColorFull : undefined,
+      color: canMove ? myColorFull : undefined,
       free: false,
-      dests: canIMove ? getDests(gameStore.currentFen) : new Map(),
+      dests: canMove ? getDests(gameStore.currentFen) : new Map(),
     },
     draggable: {
-      enabled: canIMove
+      enabled: canMove
     },
     boardStyle: {
-      '--cg-cc-light': currentTheme.value?.light, // Casilla clara
-      '--cg-cc-dark': currentTheme.value?.dark,   // Casilla oscura
+      '--cg-cc-light': currentTheme.value?.light,
+      '--cg-cc-dark': currentTheme.value?.dark,
     }
   };
 });
-const isBotOpponent = computed(() => gameStore.isBotOpponent);
-const currentTurnColor = computed(() => (gameStore.currentFen.split(' ')[1] === 'b' ? 'black' : 'white') as "white" | "black");
 
-const isMyTurn = computed(() => {
-  if (!gameStore.gameStarted || gameStore.gameEnded) return false;
-  const myColorFull = gameStore.myColor === 'w' ? 'white' : 'black';
-  return currentTurnColor.value === myColorFull;
-});
 const getCurrentPlayerTime = (): number => {
   return gameStore.myColor === 'w' ? gameStore.whiteTime : gameStore.blackTime;
 };
@@ -363,12 +389,12 @@ const playerTimeWarning = computed(() => {
   const time = getCurrentPlayerTime();
   return time > 0 && time < 10;
 });
+
 const getDests = (fen: string) => {
   try {
     const chess = new Chess(fen);
     const dests = new Map();
 
-    // Obtenemos todos los movimientos válidos y los agrupamos por casilla de origen
     chess.moves({ verbose: true }).forEach(move => {
       if (!dests.has(move.from)) {
         dests.set(move.from, []);
@@ -382,12 +408,12 @@ const getDests = (fen: string) => {
     return new Map();
   }
 };
+
 const formattedLastMove = computed(() => {
   const rawMove = gameStore.lastMove as unknown;
 
   if (!rawMove) return undefined;
 
-  // 1. Si el store lo maneja como un string plano (ej. "g8f6")
   if (typeof rawMove === 'string' && rawMove.length === 4) {
     return [
       rawMove.substring(0, 2) as Key,
@@ -395,7 +421,6 @@ const formattedLastMove = computed(() => {
     ] as [Key, Key];
   }
 
-  // 2. Si el store lo maneja como un array (ej. ['g8', 'f6'])
   if (Array.isArray(rawMove) && rawMove.length === 2) {
     return [
       String(rawMove[0]) as Key,
@@ -407,10 +432,10 @@ const formattedLastMove = computed(() => {
 });
 
 const updateWidth = () => {
-  currentWidth.value = window.innerWidth
-}
+  currentWidth.value = window.innerWidth;
+};
+
 const startCourtesyTimer = () => {
-  // ✅ Verificamos explícitamente que no sea null
   if (courtesyInterval !== null) {
     clearInterval(courtesyInterval);
     courtesyInterval = null;
@@ -422,16 +447,11 @@ const startCourtesyTimer = () => {
     if (courtesyCountdown.value > 0) {
       courtesyCountdown.value--;
     } else {
-      stopCourtesyTimer(); // ✅ Reutilizamos la función de limpieza
-
-      if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
-        console.log("⏱️ Tiempo de cortesía agotado visualmente.");
-      }
+      stopCourtesyTimer();
     }
   }, 1000);
 };
 
-// ✅ 3. Función de parada segura
 const stopCourtesyTimer = () => {
   if (courtesyInterval !== null) {
     clearInterval(courtesyInterval);
@@ -443,10 +463,9 @@ const stopCourtesyTimer = () => {
 const handleLocalMove = (moveInfo: any) => {
   if (gameStore.gameEnded || gameStore.isPaused || gameStore.drawOfferedByOpponent) return;
 
-  const turnInStore = gameStore.currentFen.split(' ')[1];
-  if (turnInStore !== gameStore.myColor) {
+  if (!isMyTurn.value) {
     console.warn("[Anti-Cheat] No es tu turno de mover.");
-    playSound('illegal'); // 🎵 Intento de movimiento no permitido
+    playSound('illegal');
     return;
   }
 
@@ -459,7 +478,7 @@ const handleLocalMove = (moveInfo: any) => {
     }
   });
 
-  stopCourtesyTimer(); // Detener cortesía visual al mover
+  stopCourtesyTimer();
 };
 
 // 📢 Acciones de botones
@@ -475,7 +494,6 @@ const offerDraw = () => {
   drawOfferNotification.value = true;
   socket.emit('offer_draw', { roomId: gameStore.roomId });
 
-  // Auto-cancelar oferta visualmente después de 30s si no hay respuesta
   setTimeout(() => {
     if (drawOfferPending.value) cancelDrawOffer();
   }, 30000);
@@ -508,7 +526,7 @@ const cancelRematch = () => {
 
 const declineRematch = () => {
   gameStore.rematchOfferedByOpponent = false;
-  socket.emit('decline_rematch', { roomId: gameStore.roomId });
+  socket.emit('rematch_declined', { roomId: gameStore.roomId });
 };
 
 const acceptRematch = () => {
@@ -527,7 +545,7 @@ const goToRegister = () => {
   sessionStorage.setItem('guest_backup_elo', gameStore.elo.toString());
   router.push('/register');
 };
-// ⏱️ Formateador de tiempo (MM:SS)
+
 const formatTime = (seconds: number): string => {
   if (!gameStore.gameStarted) {
     const initialMinutes = gameStore.selectedMinutes;
@@ -538,12 +556,10 @@ const formatTime = (seconds: number): string => {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-// 💡 Computed para mostrar cambios de Elo visualmente
 const myVisualEloChange = computed(() => {
   if (gameStore.eloChange !== 0) return gameStore.eloChange;
   const msg = gameStore.endGameMessage.toLowerCase();
   if (msg.includes('tablas') || msg.includes('empate') || msg.includes('abortada')) return 0;
-  // Si no hay datos de Elo, asumimos victoria/derrota según el mensaje
   if (msg.includes('victoria') || msg.includes('gana')) return 16;
   if (msg.includes('derrota') || msg.includes('pierde')) return -16;
   return 0;
@@ -554,7 +570,6 @@ const opponentVisualEloChange = computed(() => {
   return -myVisualEloChange.value;
 });
 
-// 🎮 Función para "Nueva Partida" (usuarios autenticados)
 const handlePlay = () => {
   if (authStore.isAuthenticated) {
     gameStore.cancelSearch();
@@ -570,7 +585,32 @@ const handlePlay = () => {
     }, 100);
   }
 };
-// ✅ Watchers para reaccionar a cambios del store (En lugar de socket.on duplicados)
+
+// 🔄 WATCHERS
+watch(
+  () => gameStore.roomId,
+  (newRoomId, oldRoomId) => {
+    if (newRoomId && newRoomId !== oldRoomId) {
+      console.log(`🔄 Reiniciando estado por cambio de sala: ${oldRoomId} -> ${newRoomId}`);
+      
+      // Detener timers locales
+      stopCourtesyTimer();
+      
+      // Limpiar modales y estados de fin de juego
+      drawOfferPending.value = false;
+      drawOfferNotification.value = false;
+      
+      // Forzar al tablero UI a cargar la posición actual (FEN inicial de la revancha)
+      if (boardAPI.value && gameStore.currentFen) {
+        boardAPI.value.setConfig({
+          fen: gameStore.currentFen,
+          orientation: gameStore.myColor === 'w' ? 'white' : 'black',
+          lastMove: undefined,
+        });
+      }
+    }
+  }
+);
 watch(() => gameStore.moveCount, (newCount) => {
   if (newCount === 1) {
     stopCourtesyTimer();
@@ -582,16 +622,15 @@ watch(() => gameStore.gameEnded, (ended) => {
     stopCourtesyTimer();
     drawOfferPending.value = false;
     drawOfferNotification.value = false;
-    playSound('gameOver'); // 🎵 Sonido de fin de partida por tiempo/abandono
+    playSound('gameOver');
   }
 });
+
 watch(
   () => gameStore.currentFen,
   (newFen, oldFen) => {
-    if (!boardAPI.value || !newFen || !oldFen) {
-      return;
-    }
-    // 🎵 DETECCIÓN DE SONIDO AL CAMBIAR FEN (Tanto mío como del rival)
+    if (!boardAPI.value || !newFen || !oldFen) return;
+
     try {
       const chessBefore = new Chess(oldFen);
       const chessAfter = new Chess(newFen);
@@ -601,7 +640,6 @@ watch(
       } else if (chessAfter.inCheck()) {
         playSound('check');
       } else {
-        // Verificar si se capturó alguna pieza comparando el número total de piezas
         const countPieces = (c: Chess) => c.board().flat().filter(Boolean).length;
         const isCapture = countPieces(chessBefore) > countPieces(chessAfter);
 
@@ -614,14 +652,11 @@ watch(
     } catch (e) {
       console.error('Error procesando audio del movimiento:', e);
     }
-    const turn = newFen.split(" ")[1];
 
+    const turn = newFen.split(" ")[1];
     const isOpponentMove = turn === gameStore.myColor;
 
     if (isOpponentMove) {
-      // ✅ setConfig permite pasar fen + lastMove juntos, así el
-      // tablero resalta la casilla de origen/destino del oponente.
-      // (setPosition solo acepta el fen y por eso el resaltado se perdía)
       boardAPI.value.setConfig({
         fen: newFen,
         lastMove: formattedLastMove.value,
@@ -635,7 +670,7 @@ watch(
     }, 300);
   }
 );
-// ✅ Detectar recarga de página
+
 onBeforeMount(() => {
   const savedRoomId = sessionStorage.getItem('game_room_id');
   const savedNick = sessionStorage.getItem('game_player_nick');
@@ -647,7 +682,6 @@ onBeforeMount(() => {
     if (savedColor === 'w' || savedColor === 'b') {
       gameStore.myColor = savedColor as 'w' | 'b';
     }
-    // El socketService.ts se encargará de emitir 'reconnect_to_room' al conectarse
     if (!socket.connected) {
       socket.connect();
     }
@@ -655,19 +689,16 @@ onBeforeMount(() => {
 });
 
 onMounted(() => {
-  console.log(currentWidth.value)
-  window.addEventListener('resize', updateWidth)
-  
+  window.addEventListener('resize', updateWidth);
+
   if (gameStore.moveCount === 0 && gameStore.myColor === 'w') {
     startCourtesyTimer();
   }
 });
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateWidth)
-  // ✅ SOLO limpiamos timers locales. NUNCA uses socket.off() aquí.
+  window.removeEventListener('resize', updateWidth);
   stopCourtesyTimer();
- 
 });
 </script>
 
